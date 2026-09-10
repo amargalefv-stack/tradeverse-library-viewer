@@ -1,0 +1,29 @@
+{
+  "meta":{"status":"PROTOTYPE","source":"Tradeverse V06 candidate","updated":"2026-09-10"},
+  "nodes":[
+    {"id":"biblioteca","parent_id":null,"order":0,"title":"Biblioteca de Trading","card_text":"Base navegable de la Biblioteca de Trading. Els continguts es convertiran node a node en la versió definitiva."},
+    {"id":"introduccion","parent_id":"biblioteca","order":0,"title":"Introducción al Trading","card_text":"Text definitiu pendent."},
+    {"id":"como-empezar","parent_id":"biblioteca","order":1,"title":"Cómo empezar en el trading","card_text":"Text definitiu pendent."},
+    {"id":"mercados","parent_id":"biblioteca","order":2,"title":"Mercados, Activos e Instrumentos Financieros","card_text":"Text definitiu pendent."},
+    {"id":"analisis","parent_id":"biblioteca","order":3,"title":"Análisis de Mercados","card_text":"Text definitiu pendent."},
+    {"id":"modalidades","parent_id":"biblioteca","order":4,"title":"Modalidades, Estrategias y Sistemas de Trading","card_text":"Text definitiu pendent."},
+    {"id":"riesgo","parent_id":"biblioteca","order":5,"title":"Gestión del Riesgo, Gestión Monetaria y Psicotrading","card_text":"Text definitiu pendent."},
+    {"id":"carteras","parent_id":"biblioteca","order":6,"title":"Gestión de Carteras / Portfolio Management","card_text":"Text definitiu pendent."},
+    {"id":"plan","parent_id":"biblioteca","order":7,"title":"Plan de Trading","card_text":"Text definitiu pendent."},
+    {"id":"retail","parent_id":"biblioteca","order":8,"title":"El Trader Retail","card_text":"Text definitiu pendent."},
+    {"id":"brokers","parent_id":"biblioteca","order":9,"title":"Brokers e Intermediación","card_text":"Text definitiu pendent."},
+    {"id":"capital","parent_id":"biblioteca","order":10,"title":"Capital, Fondeo y Social Trading","card_text":"Text definitiu pendent."},
+    {"id":"tecnologia","parent_id":"biblioteca","order":11,"title":"Tecnología, Plataformas y Herramientas","card_text":"Text definitiu pendent."},
+    {"id":"ia","parent_id":"biblioteca","order":12,"title":"Inteligencia Artificial aplicada al Trading","card_text":"Text definitiu pendent."},
+    {"id":"industria","parent_id":"biblioteca","order":13,"title":"Industria del Trading","card_text":"Text definitiu pendent."},
+    {"id":"regulacion","parent_id":"biblioteca","order":14,"title":"Regulación y Supervisión","card_text":"Text definitiu pendent."},
+    {"id":"referentes","parent_id":"biblioteca","order":15,"title":"Grandes Referentes del Trading","card_text":"Text definitiu pendent."},
+    {"id":"legal","parent_id":"biblioteca","order":16,"title":"Marco Legal, Fiscal y Profesional del Trading","card_text":"Text definitiu pendent."},
+    {"id":"exposicion","parent_id":"biblioteca","order":17,"title":"Exposición Sectorial y Temática","card_text":"Text definitiu pendent."},
+    {"id":"bibliografia","parent_id":"biblioteca","order":18,"title":"Bibliografía y Fuentes","card_text":"Text definitiu pendent."},
+    {"id":"glosario","parent_id":"biblioteca","order":19,"title":"Glosario","card_text":"Text definitiu pendent."},
+    {"id":"mapa","parent_id":"biblioteca","order":20,"title":"Mapa de Trading","card_text":"Text definitiu pendent."},
+    {"id":"guias","parent_id":"biblioteca","order":21,"title":"Guías prácticas / How To","card_text":"Text definitiu pendent."},
+    {"id":"wip","parent_id":"biblioteca","order":22,"title":"WIP","card_text":"Zona interna de treball pendent."}
+  ]
+}
