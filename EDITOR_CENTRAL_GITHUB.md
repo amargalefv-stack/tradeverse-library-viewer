@@ -1,45 +1,36 @@
-# Tradeverse · Editor central GitHub
+# Tradeverse — Editor central GitHub
 
-Aquest repositori conté el visor/editor intern de Tradeverse.
+Arquitectura tancada:
 
-## Font de veritat
+**Editor web → API server-side → GitHub central → tradeverse-project-master/main**
 
-L'editor **NO treballa sobre una còpia local ni sobre una base de dades pròpia**.
-
-Llegeix i escriu directament:
-
-- Repositori canònic: `amargalefv-stack/tradeverse-project-master`
-- Branch: `main`
+Font de veritat única:
 - Tree: `01_LIBRARY/STRUCTURE/CURRENT/ARBRE_CANONIC_DEFINITIU.csv`
 - Articles: `01_LIBRARY/ARTICLES_CURRENT/`
 
-## Editor
+L'editor no utilitza còpia local ni base de dades intermèdia.
 
-Fitxer: `editor.html`
+## Seguretat
 
-Funcions MVP:
+El token de GitHub no es guarda al navegador. L'API `api/github.js` utilitza el secret de servidor `TRADEVERSE_GITHUB_TOKEN`.
 
-- carregar el Tree canònic
-- cercar i navegar nodes
-- editar metadades del node
-- canviar títol mantenint la jerarquia dels descendents
-- crear fills
-- editar/crear el contingut Markdown de l'article associat
-- guardar directament a GitHub mitjançant commits
-- obrir l'article al GitHub
+Aquest secret s'ha de configurar al projecte d'allotjament.
 
-Cada canvi queda en l'historial de GitHub. No hi ha una base de dades intermèdia que pugui convertir-se en una segona font de veritat.
+## Guardat
 
-## Seguretat del token
+- Cada modificació del Tree crea un commit a GitHub.
+- Cada modificació d'article crea un commit a GitHub.
+- El Tree i els articles continuen sent els fitxers centrals del repositori canònic.
+- El guardat utilitza el SHA actual del fitxer; si hi ha hagut un canvi concurrent, GitHub rebutja l'actualització obsoleta en lloc de sobreescriure-la silenciosament.
 
-L'editor demana un GitHub fine-grained personal access token amb accés **Contents: Read and write** al repositori canònic.
+## Prova final
 
-El token només es guarda a `sessionStorage` del navegador i no es desa al repositori.
+1. Carregar Tree central.
+2. Editar un node.
+3. Guardar.
+4. Comprovar el commit a `tradeverse-project-master`.
+5. Recarregar.
+6. Confirmar persistència.
+7. Repetir amb un article.
 
-Per a una versió posterior es pot substituir aquest mecanisme per GitHub App/OAuth amb autenticació server-side.
-
-## Regla d'arquitectura
-
-**Tree central de GitHub → Editor → commit al mateix Tree central.**
-
-L'editor no crea ni manté una rèplica del Tree com a font operativa.
+L'allotjament només executa la interfície/API. **No és la font de dades.**
