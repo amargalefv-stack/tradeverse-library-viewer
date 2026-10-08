@@ -1,37 +1,100 @@
 <!doctype html>
 <html lang="ca">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tradeverse · Biblioteca Interna · Visor / Editor</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tradeverse · Editor central GitHub</title>
 <style>
-*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f5f6f8;color:#1f2937}header{background:#111827;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.badge{font-size:12px;background:#e5e7eb;color:#111827;padding:4px 8px;border-radius:999px}.ok{background:#d1fae5;color:#065f46}main{display:grid;grid-template-columns:390px 1fr;min-height:calc(100vh - 54px)}aside{background:#fff;border-right:1px solid #ddd;padding:14px;overflow:auto;max-height:calc(100vh - 54px);position:sticky;top:0}.toolbar{position:sticky;top:-14px;background:#fff;padding:8px 0 10px;z-index:2}.search{width:100%;padding:9px 10px;border:1px solid #ccd3dc;border-radius:7px}.tree ul{list-style:none;margin:0;padding-left:18px}.tree>ul{padding-left:0}.tree-row{display:flex;align-items:flex-start;gap:3px;margin:2px 0}.toggle{border:0;background:transparent;width:22px;min-width:22px;padding:5px 0;cursor:pointer;color:#6b7280}.node-btn{border:0;background:transparent;text-align:left;padding:5px 6px;border-radius:6px;cursor:pointer;line-height:1.25;color:#1f2937;flex:1}.node-btn:hover,.node-btn.active{background:#eef2f7}.tree-children.collapsed{display:none}.type-dot{font-size:10px;color:#9ca3af;margin-left:4px}section{padding:26px;min-width:0}.meta{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 18px}.meta span{font-size:12px;background:#eef2f7;border-radius:999px;padding:4px 8px}.summary{font-size:17px;line-height:1.55;max-width:1000px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:11px}.card{background:#fff;border:1px solid #d7dce3;border-radius:10px;padding:14px;cursor:pointer}.card:hover{border-color:#8b95a5}.card small{display:block;margin-top:7px;color:#6b7280}.article{margin-top:24px;background:#fff;border:1px solid #ddd;border-radius:10px;padding:22px;max-width:1050px}.article h2{margin-top:28px}.article h3{margin-top:22px}.article p{line-height:1.68;margin:12px 0}.empty{color:#6b7280}.path{font-size:12px;color:#6b7280;word-break:break-word;margin-top:8px}@media(max-width:850px){main{grid-template-columns:1fr}aside{position:relative;max-height:45vh;border-right:0;border-bottom:1px solid #ddd}section{padding:18px}}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#17202a}
+header{background:#111827;color:white;padding:14px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.badge{font-size:12px;padding:4px 8px;border-radius:999px;background:#e5e7eb;color:#111827}.ok{background:#d1fae5;color:#065f46}
+main{display:grid;grid-template-columns:360px 1fr;min-height:calc(100vh - 58px)}
+aside{background:#fff;border-right:1px solid #ddd;padding:12px;overflow:auto;max-height:calc(100vh - 58px)}
+section{padding:20px;min-width:0}.toolbar{position:sticky;top:-12px;background:#fff;padding-bottom:10px;z-index:3}
+input,textarea,select{font:inherit;border:1px solid #cbd5e1;border-radius:7px;padding:8px;background:#fff}
+.search{width:100%}.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}.btn{border:1px solid #cbd5e1;background:#fff;padding:8px 10px;border-radius:7px;cursor:pointer}.btn:hover{background:#f1f5f9}.primary{background:#111827;color:#fff;border-color:#111827}.danger{border-color:#ef4444;color:#b91c1c}
+.tree ul{list-style:none;margin:0;padding-left:18px}.tree>ul{padding-left:0}.tree-row{display:flex;gap:2px}.toggle{width:22px;border:0;background:transparent;cursor:pointer;color:#64748b}.node-btn{flex:1;border:0;background:transparent;text-align:left;padding:6px;border-radius:6px;cursor:pointer;line-height:1.25}.node-btn:hover,.node-btn.active{background:#e8eef6}.collapsed{display:none}.small{font-size:12px;color:#64748b}.path{word-break:break-word}
+.panel{background:#fff;border:1px solid #d7dce3;border-radius:10px;padding:16px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.field label{display:block;font-size:12px;font-weight:bold;color:#475569;margin-bottom:4px}.field input,.field select{width:100%}
+textarea{width:100%;min-height:430px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.5}
+.status{padding:9px;border-radius:7px;background:#eef2f7;margin:8px 0}.status.good{background:#d1fae5;color:#065f46}.status.bad{background:#fee2e2;color:#991b1b}
+.notice{font-size:13px;line-height:1.5;background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:8px}
+@media(max-width:850px){main{grid-template-columns:1fr}aside{max-height:42vh;border-right:0;border-bottom:1px solid #ddd}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header><b>Tradeverse · Biblioteca Interna</b><span class="badge ok">CANÒNIC · ACTUAL</span><span id="count" class="badge">carregant…</span><span class="badge">VISOR · EDITOR GITHUB</span></header>
+<header><b>Tradeverse · Editor central GitHub</b><span id="repoBadge" class="badge ok">CENTRAL · tradeverse-project-master</span><span id="count" class="badge">0 nodes</span><span id="statusBadge" class="badge">sense connexió</span></header>
 <main>
-<aside><div class="toolbar"><input id="search" class="search" placeholder="Cercar node…"></div><div id="tree" class="tree">Carregant arbre…</div></aside>
-<section><h1 id="title">Carregant…</h1><div id="meta" class="meta"></div><p id="text" class="summary"></p><div id="path" class="path"></div><h2>Fills</h2><div class="grid" id="children"></div><div class="article"><h2>Article del node</h2><div id="article">Pendent de redactar.</div></div><div class="article"><h2>Accions editor</h2><p><a id="editArticle" target="_blank" rel="noopener">Editar article a GitHub ↗</a></p><p><a id="editTree" target="_blank" rel="noopener">Editar arbre canònic a GitHub ↗</a></p></div></section>
+<aside>
+ <div class="toolbar">
+  <div class="row"><button class="btn primary" id="reloadTop">Recarregar Tree</button></div>
+  <input id="search" class="search" style="margin-top:8px" placeholder="Cercar node…">
+ </div>
+ <div class="notice">Aquest editor llegeix i escriu <b>directament</b> el repositori canònic. No hi ha còpia local ni base de dades intermèdia. L'autenticació de GitHub queda al servidor.</div>
+ <div id="tree" class="tree" style="margin-top:10px">Connecta per carregar l'arbre.</div>
+</aside>
+<section>
+ <div id="empty" class="panel"><h1>Editor de Tree + articles</h1><p>Selecciona un node. Les modificacions es guarden com a commits al repositori central.</p><p class="small">Cada guardat crea un commit al GitHub central.</p></div>
+ <div id="editor" style="display:none">
+  <div class="panel">
+   <h1 id="title">Node</h1><div id="nodePath" class="small path"></div>
+   <div class="grid" style="margin-top:14px">
+    <div class="field"><label>Títol</label><input id="fTitle"></div>
+    <div class="field"><label>Tipus</label><input id="fType"></div>
+    <div class="field"><label>Rol</label><input id="fRole"></div>
+    <div class="field"><label>Origen</label><input id="fOrigin"></div>
+    <div class="field"><label>Article file</label><input id="fArticle"></div>
+    <div class="field"><label>Sibling order</label><input id="fOrder" type="number"></div>
+   </div>
+   <div class="row" style="margin-top:12px">
+    <button class="btn primary" id="saveNode">Guardar node</button>
+    <button class="btn" id="newChild">Crear fill</button>
+    <button class="btn" id="reload">Recarregar Tree</button>
+   </div>
+   <div id="nodeStatus" class="status" style="display:none"></div>
+  </div>
+  <div class="panel">
+   <h2>Article</h2>
+   <div class="small" id="articleInfo">—</div>
+   <textarea id="articleText" placeholder="Markdown de l'article…"></textarea>
+   <div class="row" style="margin-top:10px">
+    <button class="btn primary" id="saveArticle">Guardar article</button>
+    <button class="btn" id="openGitHub">Obrir a GitHub</button>
+   </div>
+   <div id="articleStatus" class="status" style="display:none"></div>
+  </div>
+ </div>
+</section>
 </main>
 <script>
-const CHUNKS=['data/current.csv'];
-const EXPECTED=541;
-let nodes=[],byPath=new Map(),childrenByParent=new Map(),selectedPath='';
+const CENTRAL={owner:'amargalefv-stack',repo:'tradeverse-project-master',branch:'main',treePath:'01_LIBRARY/STRUCTURE/CURRENT/ARBRE_CANONIC_DEFINITIU.csv',articlesPath:'01_LIBRARY/ARTICLES_CURRENT/'};
+let rows=[], header=[], ix={}, selected=null, treeSha=null, articleSha=null, articleLoaded=false;
 const $=id=>document.getElementById(id);
+
 function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function parseCSV(text){const rows=[];let row=[],field='',q=false;for(let i=0;i<text.length;i++){const c=text[i];if(q){if(c==='"'){if(text[i+1]==='"'){field+='"';i++;}else q=false;}else field+=c;}else{if(c==='"')q=true;else if(c===','){row.push(field);field='';}else if(c==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field='';}else field+=c;}}if(field.length||row.length){row.push(field.replace(/\r$/,''));rows.push(row);}return rows.filter(r=>r.some(v=>v!==''));}
-function basicMarkdown(text){if(!text)return '<p class="empty">Article actual: obre’l des de GitHub.</p>';let out=[],para=[];const flush=()=>{if(para.length){out.push('<p>'+para.map(esc).join('<br>')+'</p>');para=[];}};for(const raw of text.split(/\n/)){const line=raw.trim();if(!line){flush();continue;}if(line.startsWith('### ')){flush();out.push('<h3>'+esc(line.slice(4))+'</h3>');}else if(line.startsWith('## ')){flush();out.push('<h2>'+esc(line.slice(3))+'</h2>');}else para.push(line);}flush();return out.join('');}
-function kids(path){return childrenByParent.get(path)||[];}
-function sortKids(a){return a.sort((x,y)=>{const ax=Number.isFinite(x.order)?x.order:999999,ay=Number.isFinite(y.order)?y.order:999999;return ax-ay||x.sourceIndex-y.sourceIndex;});}
-async function load(){try{const [chunkTexts,overrides]=await Promise.all([Promise.all(CHUNKS.map(f=>fetch(f+'?v='+Date.now()).then(r=>{if(!r.ok)throw new Error(f+' '+r.status);return r.text();}))),Promise.resolve({nodes:[]})]);let full=chunkTexts[0].replace(/^\uFEFF/,'');for(let i=1;i<chunkTexts.length;i++)full+='\n'+chunkTexts[i];const rows=parseCSV(full);const header=rows.shift().map(x=>x.replace(/^\uFEFF/,''));const ix=Object.fromEntries(header.map((h,i)=>[h,i]));nodes=rows.map((r,i)=>({path:r[ix.path]||'',parent:r[ix.parent_path]||'',depth:Number(r[ix.depth]),n1:r[ix.n1]||'',title:r[ix.title]||'',type:r[ix.type]||'',role:r[ix.role]||'',origin:r[ix.origin]||'',order:r[ix.sibling_order]===''||r[ix.sibling_order]==null?NaN:Number(r[ix.sibling_order]),sourceIndex:i,card_text:'',article_text:'',article_file:r[ix.article_file]||''})).filter(n=>n.path);
-for(const n of nodes){n.article_url=n.article_file?'https://github.com/amargalefv-stack/tradeverse-project-master/blob/main/01_LIBRARY/ARTICLES_CURRENT/'+n.article_file.split('/').map(encodeURIComponent).join('/') :'';}
-byPath=new Map(nodes.map(n=>[n.path,n]));childrenByParent=new Map();for(const n of nodes){if(!childrenByParent.has(n.parent))childrenByParent.set(n.parent,[]);childrenByParent.get(n.parent).push(n);}for(const arr of childrenByParent.values())sortKids(arr);
-$('count').textContent=`${nodes.length.toLocaleString('ca-ES')} nodes carregats`;$('count').classList.toggle('ok',nodes.length===EXPECTED);renderTree();show('Biblioteca de Trading');$('search').addEventListener('input',searchTree);}catch(e){console.error(e);$('tree').textContent='Error carregant l’arbre canònic actual.';$('title').textContent='Error de càrrega';$('count').textContent='error';}}
-function makeBranch(n,level=0){const li=document.createElement('li');const row=document.createElement('div');row.className='tree-row';const ks=kids(n.path);const tog=document.createElement('button');tog.className='toggle';tog.textContent=ks.length?(level<1?'▾':'▸'):'·';const btn=document.createElement('button');btn.className='node-btn';btn.dataset.path=n.path;btn.innerHTML=esc(n.title)+(n.role?` <span class="type-dot">${esc(n.role)}</span>`:'');row.append(tog,btn);li.append(row);btn.onclick=()=>show(n.path);if(ks.length){const ul=document.createElement('ul');ul.className='tree-children'+(level<1?'':' collapsed');for(const k of ks)ul.append(makeBranch(k,level+1));li.append(ul);tog.onclick=()=>{ul.classList.toggle('collapsed');tog.textContent=ul.classList.contains('collapsed')?'▸':'▾';};}return li;}
-function renderTree(){const roots=sortKids(nodes.filter(n=>!n.parent||!byPath.has(n.parent)));const ul=document.createElement('ul');for(const r of roots)ul.append(makeBranch(r,0));$('tree').innerHTML='';$('tree').append(ul);}
-function show(path){const n=byPath.get(path);if(!n)return;selectedPath=path;document.querySelectorAll('.node-btn.active').forEach(x=>x.classList.remove('active'));const btn=[...document.querySelectorAll('.node-btn')].find(x=>x.dataset.path===path);if(btn)btn.classList.add('active');$('title').textContent=n.title;$('text').textContent=n.card_text||'Text de targeta pendent.';$('path').textContent=n.path;$('meta').innerHTML=[n.type,n.role,n.origin].filter(Boolean).map(x=>'<span>'+esc(x)+'</span>').join('');const k=kids(path);$('children').innerHTML=k.length?k.map(c=>`<div class="card" data-path="${esc(c.path)}"><b>${esc(c.title)}</b><small>${esc(c.card_text||c.role||'Text pendent')}</small></div>`).join(''):'<p class="empty">Aquest node no té fills directes a V06.</p>';$('children').querySelectorAll('.card').forEach(c=>c.onclick=()=>show(c.dataset.path));$('article').innerHTML=n.article_url?`<p><a href="${esc(n.article_url)}" target="_blank" rel="noopener">Obrir article actual al GitHub ↗</a></p>`:'<p class="empty">Sense article associat.</p>';const edit=$('editArticle');edit.href=n.article_file?'https://github.com/amargalefv-stack/tradeverse-project-master/edit/main/01_LIBRARY/ARTICLES_CURRENT/'+n.article_file.split('/').map(encodeURIComponent).join('/'):'#';edit.style.display=n.article_file?'inline':'none';$('editTree').href='https://github.com/amargalefv-stack/tradeverse-project-master/edit/main/01_LIBRARY/STRUCTURE/CURRENT/ARBRE_CANONIC_DEFINITIU.csv';}
-function searchTree(){const q=$('search').value.trim().toLowerCase();if(!q){renderTree();if(selectedPath)show(selectedPath);return;}const matches=nodes.filter(n=>n.title.toLowerCase().includes(q)||n.path.toLowerCase().includes(q)).slice(0,100);const box=$('tree');box.innerHTML='';if(!matches.length){box.textContent='Cap resultat.';return;}for(const n of matches){const b=document.createElement('button');b.className='node-btn';b.style.display='block';b.style.width='100%';b.innerHTML=esc(n.title)+'<div class="path">'+esc(n.path)+'</div>';b.onclick=()=>show(n.path);box.append(b);}}
-load();
+function parseCSV(text){const out=[];let row=[],f='',q=false;for(let i=0;i<text.length;i++){let c=text[i];if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false}else f+=c}else{if(c==='"')q=true;else if(c===','){row.push(f);f=''}else if(c==='\n'){row.push(f.replace(/\r$/,''));out.push(row);row=[];f=''}else f+=c}}if(f!==''||row.length){row.push(f.replace(/\r$/,''));out.push(row)}return out.filter(r=>r.some(v=>v!==''));}
+function csvCell(v){v=v==null?'':String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function makeCSV(){return [header.map(csvCell).join(','),...rows.map(r=>header.map((_,i)=>csvCell(r[i]||'')).join(','))].join('\n')+'\n';}
+function pathFor(r){return r[ix.path]||''} function parentFor(r){return r[ix.parent_path]||''}
+function nodeTitle(r){return r[ix.title]||''}
+function children(path){return rows.filter(r=>parentFor(r)===path).sort((a,b)=>(Number(a[ix.sibling_order]||999999)-Number(b[ix.sibling_order]||999999)));}
+async function api(path,opt={}){const u='/api/github?path='+encodeURIComponent(path);const o={...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}};const r=await fetch(u,o);if(!r.ok){let t=await r.text();throw new Error(r.status+' '+t.slice(0,500));}return r.json();}
+async function getFile(path){return api(path,{ref:CENTRAL.branch});}
+async function putFile(path,content,sha,message){return api(path,{method:'PUT',body:JSON.stringify({message,content,sha})});}
+function setStatus(id,msg,good=true){const e=$(id);e.textContent=msg;e.className='status '+(good?'good':'bad');e.style.display='block';}
+function buildTree(){const roots=rows.filter(r=>!parentFor(r)||!rows.some(x=>pathFor(x)===parentFor(r))).sort((a,b)=>Number(a[ix.sibling_order]||999999)-Number(b[ix.sibling_order]||999999));const ul=document.createElement('ul');roots.forEach(r=>ul.append(branch(r,0)));$('tree').innerHTML='';$('tree').append(ul);}
+function branch(r,level){const li=document.createElement('li'),row=document.createElement('div');row.className='tree-row';const kids=children(pathFor(r));const t=document.createElement('button');t.className='toggle';t.textContent=kids.length?(level<1?'▾':'▸'):'·';const b=document.createElement('button');b.className='node-btn';b.dataset.path=pathFor(r);b.innerHTML=esc(nodeTitle(r))+' <span class="small">'+esc(r[ix.role]||'')+'</span>';b.onclick=()=>selectNode(pathFor(r));row.append(t,b);li.append(row);if(kids.length){const u=document.createElement('ul');u.className=level<1?'':'collapsed';kids.forEach(k=>u.append(branch(k,level+1)));li.append(u);t.onclick=()=>{u.classList.toggle('collapsed');t.textContent=u.classList.contains('collapsed')?'▸':'▾'}}return li}
+function selectNode(path){selected=rows.find(r=>pathFor(r)===path);if(!selected)return;$('empty').style.display='none';$('editor').style.display='block';document.querySelectorAll('.node-btn.active').forEach(x=>x.classList.remove('active'));const btn=[...document.querySelectorAll('.node-btn')].find(x=>x.dataset.path===path);if(btn)btn.classList.add('active');$('title').textContent=nodeTitle(selected);$('nodePath').textContent=path;$('fTitle').value=nodeTitle(selected);$('fType').value=selected[ix.type]||'';$('fRole').value=selected[ix.role]||'';$('fOrigin').value=selected[ix.origin]||'';$('fArticle').value=selected[ix.article_file]||'';$('fOrder').value=selected[ix.sibling_order]||0;$('articleText').value='';$('articleInfo').textContent='Carregant article…';articleLoaded=false;loadArticle(selected);}
+async function loadArticle(r){articleSha=null;const f=r[ix.article_file];if(!f){$('articleInfo').textContent='Aquest node no té article_file.';$('articleText').value='';articleLoaded=true;return}try{const d=await getFile(CENTRAL.articlesPath+f);articleSha=d.sha;const raw=decodeURIComponent(escape(atob(d.content.replace(/\n/g,''))));$('articleText').value=raw;$('articleInfo').textContent=f+' · SHA '+d.sha.slice(0,10);articleLoaded=true}catch(e){$('articleInfo').textContent='No s’ha pogut carregar l’article: '+e.message;$('articleText').value='';articleLoaded=false}}
+function slug(s){return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'node';}
+function newId(prefix){return prefix+'_'+Math.random().toString(16).slice(2,14);}
+function renameSubtree(oldPath,newPath){for(const r of rows){const p=pathFor(r);if(p===oldPath||p.startsWith(oldPath+' > ')){const suffix=p.slice(oldPath.length);r[ix.path]=newPath+suffix;r[ix.parent_path]=parentFor(r)===oldPath?newPath:(parentFor(r).startsWith(oldPath+' > ')?newPath+parentFor(r).slice(oldPath.length):parentFor(r));}}}
+$('reloadTop').onclick=loadTree;
+$('reload').onclick=loadTree;
+async function loadTree(){try{$('statusBadge').textContent='carregant…';const d=await getFile(CENTRAL.treePath);treeSha=d.sha;const raw=decodeURIComponent(escape(atob(d.content.replace(/\n/g,''))));const all=parseCSV(raw);header=all.shift();ix=Object.fromEntries(header.map((h,i)=>[h,i]));rows=all;$('count').textContent=rows.length+' nodes';$('statusBadge').textContent='CENTRAL · carregat';$('statusBadge').className='badge ok';buildTree();if(selected)selectNode(pathFor(selected));}catch(e){$('statusBadge').textContent='error';setStatus('nodeStatus','No s’ha pogut carregar GitHub: '+e.message,false)}}
+$('saveNode').onclick=async()=>{if(!selected||!treeSha)return;try{const oldPath=pathFor(selected),parent=parentFor(selected),title=$('fTitle').value.trim();if(!title)throw new Error('El títol és obligatori');let newPath=parent?parent+' > '+title:title;const titleChanged=newPath!==oldPath;if(titleChanged)renameSubtree(oldPath,newPath);selected[ix.title]=title;selected[ix.type]=$('fType').value.trim();selected[ix.role]=$('fRole').value.trim();selected[ix.origin]=$('fOrigin').value.trim();selected[ix.article_file]=$('fArticle').value.trim();selected[ix.sibling_order]=$('fOrder').value===''?'0':$('fOrder').value;const fresh=await getFile(CENTRAL.treePath);const result=await putFile(CENTRAL.treePath,makeCSV(),fresh.sha,'editor: actualitza Tree · '+title);treeSha=result.content?.sha||null;setStatus('nodeStatus','Tree guardat al repositori central. Commit '+result.commit?.sha?.slice(0,10),'good');await loadTree();const finalPath=newPath;const nr=rows.find(r=>pathFor(r)===finalPath);if(nr)selectNode(finalPath);}catch(e){setStatus('nodeStatus','NO guardat: '+e.message,false);await loadTree()}};
+$('saveArticle').onclick=async()=>{if(!selected)return;const f=$('fArticle').value.trim();if(!f){setStatus('articleStatus','Primer indica article_file al node.',false);return}try{const path=CENTRAL.articlesPath+f;let current=null;try{current=await getFile(path)}catch(e){if(!String(e.message).startsWith('404'))throw e}const result=await putFile(path,$('articleText').value,current?.sha||null,'editor: guarda article · '+nodeTitle(selected));articleSha=result.content?.sha||null;setStatus('articleStatus','Article guardat directament a GitHub. Commit '+result.commit?.sha?.slice(0,10),'good');}catch(e){setStatus('articleStatus','NO guardat: '+e.message,false)}};
+$('openGitHub').onclick=()=>{if(!selected)return;const f=$('fArticle').value.trim();if(f)window.open('https://github.com/'+CENTRAL.owner+'/'+CENTRAL.repo+'/edit/'+CENTRAL.branch+'/'+CENTRAL.articlesPath+f,'_blank');};
+$('newChild').onclick=async()=>{if(!selected)return;const title=prompt('Títol del nou fill:');if(!title)return;try{const parent=pathFor(selected),kids=children(parent);const r=Array(header.length).fill('');const set=(k,v)=>{if(ix[k]!=null)r[ix[k]]=v};set('path',parent+' > '+title);set('parent_path',parent);set('depth',Number(selected[ix.depth]||0)+1);set('n1',selected[ix.n1]||'');set('title',title);set('type','ARTICLE');set('role','LEAF_ARTICLE');set('origin','EDITOR_GITHUB');set('v16_nodes_covered','0');set('v16_masterarticles_attached','0');set('sibling_order',kids.length);set('node_id',newId('N'));set('parent_node_id',selected[ix.node_id]||'');set('article_id',newId('A'));set('article_file',slug(title)+'.md');set('article_relation','OWN_ARTICLE');set('link_confidence','EXACT');set('link_source','editor');set('base_status','EDITOR_CREATED');set('base_evidence','EDITOR_GITHUB');rows.push(r);const fresh=await getFile(CENTRAL.treePath);const result=await putFile(CENTRAL.treePath,makeCSV(),fresh.sha,'editor: crea fill · '+title);treeSha=result.content?.sha||null;setStatus('nodeStatus','Fill creat i guardat al Tree central. Commit '+result.commit?.sha?.slice(0,10),'good');await loadTree();selectNode(parent+' > '+title);}catch(e){setStatus('nodeStatus','NO creat: '+e.message,false);await loadTree()}};
+$('search').oninput=()=>{const q=$('search').value.trim().toLowerCase();if(!q){buildTree();return}const m=rows.filter(r=>(r[ix.title]||'').toLowerCase().includes(q)||(r[ix.path]||'').toLowerCase().includes(q)).slice(0,150);$('tree').innerHTML='';m.forEach(r=>{const b=document.createElement('button');b.className='node-btn';b.style.display='block';b.style.width='100%';b.innerHTML=esc(nodeTitle(r))+'<div class="small path">'+esc(pathFor(r))+'</div>';b.onclick=()=>selectNode(pathFor(r));$('tree').append(b)})};
+loadTree();
 </script>
 </body></html>
