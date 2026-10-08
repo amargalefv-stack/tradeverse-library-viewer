@@ -1,1 +1,0 @@
-{"version":2,"functions":{"api/github.js":{"runtime":"nodejs24.x"}},"routes":[{"src":"/api/github","dest":"/api/github.js"},{"src":"/(.*)","dest":"/index.html"}]}
