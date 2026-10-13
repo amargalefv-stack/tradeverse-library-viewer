@@ -68,27 +68,25 @@ const inlineMD=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace
 for(const line of lines){const h=line.match(/^(#{1,4})\s+(.+)$/);const li=line.match(/^\s*[-*+]\s+(.+)$/);if(h){flush();const n=h[1].length;out+='<h'+n+'>'+inlineMD(h[2])+'</h'+n+'>';continue;}if(li){if(para.length){out+='<p>'+inlineMD(para.join(' '))+'</p>';para=[];}if(list!=='ul'){if(list)out+='</'+list+'>';out+='<ul>';list='ul';}out+='<li>'+inlineMD(li[1])+'</li>';continue;}if(!line.trim()){flush();continue;}if(line.startsWith('> ')){flush();out+='<blockquote>'+inlineMD(line.slice(2))+'</blockquote>';continue;}para.push(line.trim());}flush();return out||'<p class="muted">L’article no té contingut visible.</p>';
 }
 async function showArticle(r){
-const panel=$('articlePanel'),status=$('articleStatus'),content=$('articleContent');panel.classList.remove('hidden');status.textContent='Cercant l’article associat…';content.replaceChildren();
-const val=k=>{const i=headers.indexOf(k);return i>=0?(r[i]||'').trim():'';};
-const base='01_LIBRARY/ARTICLES_CURRENT/';
-const candidates=[];
-for(const raw of [val('article_id'),val('web_slug')]){
- if(!raw)continue;
- if(raw.endsWith('.md'))candidates.push(raw.includes('/')?raw:base+raw);
- else candidates.push(base+raw+'.md');
-}
-const title=val('web_title')||val('title');
-if(title){const slug=title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_|_$/g,'');if(slug)candidates.push(base+slug+'.md');}
-const unique=[...new Set(candidates)];
-if(!unique.length){status.textContent='Aquest node no té article_id ni web_slug assignat.';return;}
-for(const path of unique){try{
- const d=await github('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(BRANCH));
- if(!d.content)continue;
- const md=decode64(d.content);status.textContent='Article carregat: '+path;
- content.innerHTML=markdownHTML(md);
- const link=document.createElement('p');link.className='small';link.innerHTML='<a target="_blank" rel="noopener noreferrer" href="https://github.com/'+OWNER+'/'+REPO+'/blob/'+BRANCH+'/'+path.split('/').map(encodeURIComponent).join('/')+'">Obrir article original a GitHub</a>';content.append(link);return;
-}catch(e){if(!String(e.message).includes('GitHub 404')){status.textContent='No s’ha pogut carregar l’article: '+e.message;return;}}}
-status.textContent='No s’ha trobat cap fitxer Markdown amb article_id, web_slug o títol d’aquest node.';
+ const panel=$('articlePanel'),status=$('articleStatus'),content=$('articleContent');panel.classList.remove('hidden');status.textContent='Cercant l’article associat…';content.replaceChildren();
+ const val=k=>{const i=headers.indexOf(k);return i>=0?(r[i]||'').trim():'';};
+ const normalize=s=>String(s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+ const raw=[val('article_id'),val('web_slug'),val('web_title'),val('title')].filter(Boolean);
+ const names=new Set(raw.map(normalize));
+ for(const n of [...names]){names.add(n.replace(/_/g,'-'));names.add(n.replace(/-/g,'_'));}
+ try{
+  const d=await github('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+encodeURIComponent(BRANCH)+'?recursive=1');
+  const files=(d.tree||[]).filter(x=>x.type==='blob'&&x.path.startsWith('TREEWEB_ARTICLES/')&&x.path.toLowerCase().endsWith('.md'));
+  const matches=files.filter(x=>{const base=x.path.split('/').pop().replace(/\\.md$/i,'');return names.has(normalize(base));});
+  if(matches.length){
+   const preferred=matches.find(x=>normalize(x.path.split('/').pop().replace(/\\.md$/i,''))===normalize(val('web_slug')))||matches[0];
+   const blob=await github('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/blobs/'+preferred.sha);
+   const md=decode64(blob.content||'');status.textContent='Article carregat: '+preferred.path;
+   content.innerHTML=markdownHTML(md);
+   const link=document.createElement('p');link.className='small';link.innerHTML='<a target="_blank" rel="noopener noreferrer" href="https://github.com/'+OWNER+'/'+REPO+'/blob/'+BRANCH+'/'+preferred.path.split('/').map(encodeURIComponent).join('/')+'">Obrir article original a GitHub</a>';content.append(link);return;
+  }
+  status.textContent='No s’ha trobat cap article per aquest node a TREEWEB_ARTICLES/. Coincidències de nom: '+matches.length+'.';
+ }catch(e){status.textContent='No s’ha pogut carregar l’article: '+e.message;}
 }
 function search(){const q=$('search').value.trim().toLocaleLowerCase();if(!q){renderTree();if(selectedId)selectNode(selectedId);return;}const hits=rows.filter(r=>r.some(v=>String(v||'').toLocaleLowerCase().includes(q))).slice(0,300);const box=$('tree');box.replaceChildren();hits.forEach(r=>{const b=document.createElement('button');b.className='node';b.style.display='block';b.style.width='100%';b.style.margin='3px 0';b.innerHTML='<b>'+esc(label(r))+'</b><div class="small">'+esc(r[headers.indexOf('node_id')])+'</div>';b.onclick=()=>selectNode(r[headers.indexOf('node_id')]);box.append(b);});}
 $('connect').onclick=async()=>{token=$('token').value.trim();if(!token){$('loginStatus').textContent='Introdueix un token de GitHub amb permís de lectura del repositori.';$('loginStatus').classList.remove('hidden');return;}sessionStorage.setItem('tradeverse_treeweb_token',token);sessionStorage.setItem('tradeverse_editor_token',token);try{await github('https://api.github.com/user');await load();}catch(e){$('loginStatus').textContent='No s’ha pogut carregar: '+e.message;$('loginStatus').classList.remove('hidden');}};
