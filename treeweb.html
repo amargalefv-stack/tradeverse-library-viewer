@@ -77,9 +77,9 @@ async function showArticle(r){
  try{
   const d=await github('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+encodeURIComponent(BRANCH)+'?recursive=1');
   const files=(d.tree||[]).filter(x=>x.type==='blob'&&x.path.toLowerCase().endsWith('.md')&&(/^(TREEWEB_ARTICLES|01_LIBRARY\/ARTICLES_CURRENT|01_LIBRARY\/ARTICLES_V3|LIBRARY_WEB\/articles)\//i).test(x.path));
-  const matches=files.filter(x=>{const base=x.path.split('/').pop().replace(/\\.md$/i,'');return names.has(normalize(base));});
+  const matches=files.filter(x=>{const base=x.path.split('/').pop().replace(/\.md$/i,'');return names.has(normalize(base));});
   if(matches.length){
-   const preferred=matches.find(x=>normalize(x.path.split('/').pop().replace(/\\.md$/i,''))===normalize(val('web_slug')))||matches[0];
+   const preferred=matches.find(x=>normalize(x.path.split('/').pop().replace(/\.md$/i,''))===normalize(val('web_slug')))||matches[0];
    const blob=await github('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/blobs/'+preferred.sha);
    const md=decode64(blob.content||'');status.textContent='Article carregat: '+preferred.path;
    content.innerHTML=markdownHTML(md);
