@@ -70,13 +70,13 @@ for(const line of lines){const h=line.match(/^(#{1,4})\s+(.+)$/);const li=line.m
 async function showArticle(r){
  const panel=$('articlePanel'),status=$('articleStatus'),content=$('articleContent');panel.classList.remove('hidden');status.textContent='Cercant l’article associat…';content.replaceChildren();
  const val=k=>{const i=headers.indexOf(k);return i>=0?(r[i]||'').trim():'';};
- const normalize=s=>String(s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+ const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
  const raw=[val('article_id'),val('web_slug'),val('web_title'),val('title')].filter(Boolean);
  const names=new Set(raw.map(normalize));
  for(const n of [...names]){names.add(n.replace(/_/g,'-'));names.add(n.replace(/-/g,'_'));}
  try{
   const d=await github('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+encodeURIComponent(BRANCH)+'?recursive=1');
-  const files=(d.tree||[]).filter(x=>x.type==='blob'&&x.path.toLowerCase().endsWith('.md')&&(x.path.startsWith('TREEWEB_ARTICLES/')||x.path.startsWith('01_LIBRARY/ARTICLES_CURRENT/')));
+  const files=(d.tree||[]).filter(x=>x.type==='blob'&&x.path.toLowerCase().endsWith('.md')&&(/^(TREEWEB_ARTICLES|01_LIBRARY\/ARTICLES_CURRENT|01_LIBRARY\/ARTICLES_V3|LIBRARY_WEB\/articles)\//i).test(x.path));
   const matches=files.filter(x=>{const base=x.path.split('/').pop().replace(/\\.md$/i,'');return names.has(normalize(base));});
   if(matches.length){
    const preferred=matches.find(x=>normalize(x.path.split('/').pop().replace(/\\.md$/i,''))===normalize(val('web_slug')))||matches[0];
