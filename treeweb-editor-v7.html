@@ -364,6 +364,22 @@ async function restore(ask=true){
    if(oldHeaders.join('\u0000')!==d.headers.join('\u0000'))throw Error('les columnes de la versió base no coincideixen amb les de l’esborrany');
    if(latestHeaders.join('\u0000')!==d.headers.join('\u0000'))throw Error('les columnes de GitHub han canviat; cal revisar l’esquema abans de fusionar');
    draftBaseTree=oldCommit.tree.sha;
+   // Do not replace a newer GitHub tree with a stale local snapshot if that
+   // snapshot contains no edits of its own relative to its recorded baseline.
+   const baselineById=new Map(draftBaseRows.map(r=>[nid(r),r]));
+   const draftById=new Map(d.rows.map(r=>[nid(r),r]));
+   const allIds=new Set([...baselineById.keys(),...draftById.keys()]);
+   const sameRow=(a,b,cols)=>!!a&&!!b&&cols.every(k=>String(a[k]??'')===String(b[k]??''));
+   const draftHasTreeChanges=[...allIds].some(id=>!sameRow(baselineById.get(id),draftById.get(id),d.headers));
+   const savedArticles=d.articles||{},baselineArticles=d.baseArticles||{};
+   const articlePaths=new Set([...Object.keys(savedArticles),...Object.keys(baselineArticles)]);
+   const draftHasArticleChanges=[...articlePaths].some(p=>!Object.prototype.hasOwnProperty.call(savedArticles,p)||!Object.prototype.hasOwnProperty.call(baselineArticles,p)||savedArticles[p]!==baselineArticles[p]);
+   if(!draftHasTreeChanges&&!draftHasArticleChanges){
+    $('draftStatus').className='status warn';
+    $('draftStatus').textContent='S’ha detectat una còpia local antiga sense canvis propis pendents. He mantingut la versió ACTUAL de GitHub ('+live.rows.length.toLocaleString('ca-ES')+' nodes) a la pantalla; la còpia antiga ('+d.rows.length.toLocaleString('ca-ES')+' nodes) encara es conserva al navegador fins que premis «Desar local».';
+    showVisibleStatus('warn','VERSIÓ LOCAL ANTIGA DETECTADA · L’esborrany antic no conté canvis propis pendents. Es mostra la versió actual de GitHub ('+live.rows.length.toLocaleString('ca-ES')+' nodes), no la còpia antiga ('+d.rows.length.toLocaleString('ca-ES')+'). La còpia antiga encara no s’ha eliminat; prem «Desar local» per substituir-la per aquesta versió actual.');
+    return;
+   }
   }else if(d.baseCommit!==live.baseCommit){
    throw Error('l’esborrany no conté el commit base necessari per fer una fusió segura');
   }
