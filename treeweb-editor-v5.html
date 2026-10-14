@@ -36,7 +36,7 @@ function render(){
  childMap.forEach(sortNodes);
  const kids=id=>childMap.get(id)||[],roots=sortNodes(rows.filter(r=>!par(r)||!byId.has(par(r))));
  $('nodes').replaceChildren();const visible=new Set();
- if(q){rows.forEach(r=>{if((label(r)+' '+nid(r)).toLocaleLowerCase().includes(q)){let x=r;while(x){visible.add(nid(x));const p=byId.get(par(x));if(p)expandedNodes.add(nid(p));x=p}}})}else rows.forEach(r=>visible.add(nid(r)));
+ if(q){rows.forEach(r=>{if((label(r)+' '+nid(r)).toLocaleLowerCase().includes(q)){let x=r,seen=new Set();while(x&&!seen.has(nid(x))){seen.add(nid(x));visible.add(nid(x));const p=byId.get(par(x));if(p)expandedNodes.add(nid(p));x=p}}})}else rows.forEach(r=>visible.add(nid(r)));
  if(!treeInitialized){roots.forEach(r=>expandedNodes.add(nid(r)));treeInitialized=true}
  function makeNode(r,depth){
   if(!visible.has(nid(r)))return null;
