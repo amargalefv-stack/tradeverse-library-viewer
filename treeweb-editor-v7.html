@@ -271,9 +271,62 @@ function changedArticles(){return Object.keys(articles).filter(p=>{const f=files
 function review(){let d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length;if($('summary'))$('summary').textContent=n?n+' canvis pendents':'Sense canvis pendents';if($('details'))$('details').textContent='';}
 function notice(){let d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length;$('draftStatus').className='status '+(n?'warn':'');$('draftStatus').textContent=n?n+' canvis locals pendents. No publicats a GitHub.':'Sense canvis locals pendents.';review()}
 function dbOpen(){return new Promise((res,rej)=>{let q=indexedDB.open(DB,1);q.onupgradeneeded=()=>q.result.createObjectStore(STORE);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
-async function dbSet(v){let db=await dbOpen();return new Promise((res,rej)=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,KEY);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>rej(tx.error)})}
+async function dbSet(v){
+ const db=await dbOpen();
+ return new Promise((resolve,reject)=>{
+  let tx;
+  try{
+   tx=db.transaction(STORE,'readwrite');
+   tx.objectStore(STORE).put(v,KEY);
+  }catch(e){db.close();reject(e);return}
+  let settled=false;
+  tx.oncomplete=()=>{if(settled)return;settled=true;db.close();resolve()};
+  tx.onerror=()=>{if(settled)return;settled=true;const e=tx.error||new Error('Error d’IndexedDB');db.close();reject(e)};
+  tx.onabort=()=>{if(settled)return;settled=true;const e=tx.error||new Error('La transacció local s’ha cancel·lat');db.close();reject(e)};
+ });
+}
 async function dbGet(){let db=await dbOpen();return new Promise((res,rej)=>{let q=db.transaction(STORE).objectStore(STORE).get(KEY);q.onsuccess=()=>{db.close();res(q.result)};q.onerror=()=>rej(q.error)})}
-async function save(){if(!prepareForSave())return false;await dbSet({version:1,baseCommit,headers,rows,selected,articles,baseArticles});notice();$('draftStatus').textContent='Esborrany desat localment al navegador. '+$('draftStatus').textContent}
+function showVisibleStatus(kind,message){
+ const box=$('publishStatus');
+ box.className='status'+(kind?' '+kind:'');
+ box.classList.remove('hidden');
+ box.textContent=message;
+}
+async function save(){
+ const button=$('saveDraft');
+ button.disabled=true;
+ showVisibleStatus('','Desant esborrany al navegador i verificant l’escriptura…');
+ try{
+  if(!prepareForSave()){
+   showVisibleStatus('err','NO S’HA DESAT: hi ha un canvi al formulari o a l’article que no s’ha pogut aplicar. Revisa el missatge i torna-ho a provar.');
+   return false;
+  }
+  const snapshot={
+   version:1,baseCommit,headers:[...headers],rows:rows.map(r=>({...r})),
+   selected,articles:{...articles},baseArticles:{...baseArticles},
+   savedAt:new Date().toISOString()
+  };
+  await dbSet(snapshot);
+  const check=await dbGet();
+  const sameMap=(a,b)=>{
+   if(!a||!b||typeof a!=='object'||typeof b!=='object')return false;
+   const ka=Object.keys(a).sort(),kb=Object.keys(b).sort();
+   return ka.length===kb.length&&ka.every((k,i)=>k===kb[i]&&a[k]===b[k]);
+  };
+  const sameRows=Array.isArray(check?.rows)&&check.rows.length===snapshot.rows.length&&check.rows.every((r,i)=>snapshot.headers.every(k=>String(r[k]??'')===String(snapshot.rows[i][k]??'')));
+  const verified=!!check&&check.version===snapshot.version&&check.baseCommit===snapshot.baseCommit&&check.selected===snapshot.selected&&JSON.stringify(check.headers)===JSON.stringify(snapshot.headers)&&sameRows&&sameMap(check.articles||{},snapshot.articles)&&sameMap(check.baseArticles||{},snapshot.baseArticles);
+  if(!verified)throw Error('La lectura de comprovació no coincideix amb les dades que s’han intentat desar.');
+  notice();
+  const d=diff(),pending=d.add.length+d.mod.length+d.del.length+d.art.length;
+  showVisibleStatus('ok','DESAT EN LOCAL I VERIFICAT · '+snapshot.rows.length.toLocaleString('ca-ES')+' nodes · '+pending+' canvis pendents de publicar a GitHub. Aquest missatge confirma només el desament local.');
+  return true;
+ }catch(e){
+  showVisibleStatus('err','ERROR: NO S’HA POGUT CONFIRMAR EL DESAMENT LOCAL. '+(e?.message||String(e))+' No recarreguis la pàgina fins a resoldre-ho.');
+  return false;
+ }finally{
+  button.disabled=false;
+ }
+}
 async function restore(ask=true){
  const d=await dbGet();
  if(!d)return;
@@ -449,7 +502,7 @@ async function discardDraftAfterPublish(){let db=await dbOpen();await new Promis
 $('connect').onclick=async()=>{token=$('token').value.trim();if(!token)return;$('loginStatus').classList.remove('hidden');$('loginStatus').textContent='Connectant…';sessionStorage.setItem('tradeverse_editor_token',token);sessionStorage.setItem('tradeverse_treeweb_token',token);try{await load()}catch(e){$('loginStatus').textContent='Error: '+e.message}};
 $('forget').onclick=()=>{token='';sessionStorage.removeItem('tradeverse_editor_token');sessionStorage.removeItem('tradeverse_treeweb_token');$('token').value=''};
 $('rootDrop').addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';$('rootDrop').classList.add('drop-target')});$('rootDrop').addEventListener('dragleave',()=> $('rootDrop').classList.remove('drop-target'));$('rootDrop').addEventListener('drop',e=>{e.preventDefault();$('rootDrop').classList.remove('drop-target');const id=e.dataTransfer.getData('text/plain');if(id)moveToRoot(id)});
-$('search').oninput=render;$('newRoot').onclick=()=>create('WEBTREE-ROOT');$('newChild').onclick=()=>selected?create(selected):alert('Selecciona primer el pare.');$('applyNode').onclick=applyNode;$('deleteNode').onclick=removeNode;$('moveOutdent').onclick=moveOutdent;$('moveIndent').onclick=moveIndent;$('moveUp').onclick=()=>moveSibling(-1);$('moveDown').onclick=()=>moveSibling(1);$('loadArticle').onclick=()=>loadArticle().catch(e=>alert(e.message));$('applyArticle').onclick=applyArticle;$('saveDraft').onclick=()=>save().catch(e=>alert('No s’ha pogut desar: '+e.message));$('restoreDraft')&&($('restoreDraft').onclick=()=>restore(true).catch(e=>alert(e.message)));$('discardDraft')&&($('discardDraft').onclick=()=>discard().catch(e=>alert(e.message)));$('publish').onclick=publish;$('reloadGithub').onclick=reloadFromGithub;
+$('search').oninput=render;$('newRoot').onclick=()=>create('WEBTREE-ROOT');$('newChild').onclick=()=>selected?create(selected):alert('Selecciona primer el pare.');$('applyNode').onclick=applyNode;$('deleteNode').onclick=removeNode;$('moveOutdent').onclick=moveOutdent;$('moveIndent').onclick=moveIndent;$('moveUp').onclick=()=>moveSibling(-1);$('moveDown').onclick=()=>moveSibling(1);$('loadArticle').onclick=()=>loadArticle().catch(e=>alert(e.message));$('applyArticle').onclick=applyArticle;$('saveDraft').onclick=()=>{save()};$('restoreDraft')&&($('restoreDraft').onclick=()=>restore(true).catch(e=>alert(e.message)));$('discardDraft')&&($('discardDraft').onclick=()=>discard().catch(e=>alert(e.message)));$('publish').onclick=publish;$('reloadGithub').onclick=reloadFromGithub;
 $('form').querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('input',()=>{if(selected)formDirty=true}));$('form').querySelectorAll('select').forEach(el=>el.addEventListener('change',()=>{if(selected)formDirty=true}));$('articleBody').addEventListener('input',()=>{if(selected)articleDirty=true});
 if(token)load().catch(e=>{$('login').classList.remove('hidden');$('loginStatus').classList.remove('hidden');$('loginStatus').textContent='Connexió automàtica fallida: '+e.message});
 </script></body></html>
