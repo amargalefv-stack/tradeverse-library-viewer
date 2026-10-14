@@ -188,7 +188,7 @@ async function load(skipSavedDraft=false,expectedHead=''){
 function render(){
  const q=$('search').value.trim().toLocaleLowerCase(),byId=new Map(rows.map(r=>[nid(r),r])),childMap=new Map();
  rows.forEach(r=>{const p=par(r);if(p&&byId.has(p)){if(!childMap.has(p))childMap.set(p,[]);childMap.get(p).push(r)}});
- const sortNodes=a=>a.sort((x,y)=>(Number(x.order)||999999)-(Number(y.order)||999999)||label(x).localeCompare(label(y)));
+ const sortNodes=a=>a.sort((x,y)=>orderKey(x)-orderKey(y)||label(x).localeCompare(label(y)));
  childMap.forEach(sortNodes);
  const kids=id=>childMap.get(id)||[],roots=sortNodes(rows.filter(r=>!par(r)||!byId.has(par(r))));
  $('nodes').replaceChildren();const visible=new Set();
@@ -231,7 +231,8 @@ function recalcSubtree(id){
  }
  walk(byId.get(id))
 }
-function siblingList(parent,idToExclude=''){return rows.filter(r=>par(r)===parent&&nid(r)!==idToExclude).sort((a,b)=>(Number(a.order)||999999)-(Number(b.order)||999999)||label(a).localeCompare(label(b)))}
+function orderKey(r){const raw=String(r?.order??'').trim();if(raw==='')return Number.MAX_SAFE_INTEGER;const value=Number(raw);return Number.isFinite(value)?value:Number.MAX_SAFE_INTEGER}
+function siblingList(parent,idToExclude=''){return rows.filter(r=>par(r)===parent&&nid(r)!==idToExclude).sort((a,b)=>orderKey(a)-orderKey(b)||label(a).localeCompare(label(b)))}
 function renumber(list){list.forEach((r,i)=>r.order=String(i+1))}
 function reorderSiblingToPosition(r,requestedPosition){
  const p=par(r),rest=siblingList(p,nid(r)),pos=Number(requestedPosition),max=rest.length+1;
