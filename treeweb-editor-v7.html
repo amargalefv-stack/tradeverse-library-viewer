@@ -7,9 +7,11 @@ body{margin:0;font:14px/1.32 system-ui,Arial,sans-serif;background:#f3f5f8;color
 header{background:#111827;color:white;padding:9px 12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 header b{font-size:15px}
 .tag{background:#dbeafe;color:#1e40af;border-radius:16px;padding:3px 7px;font-size:11px}
-main{display:grid;grid-template-columns:minmax(290px,350px) minmax(0,1fr);min-height:calc(100vh - 46px)}
-aside,section{padding:10px;min-width:0}
-aside{background:#fff;border-right:1px solid #d8dee8;max-height:calc(100vh - 46px);overflow:auto}
+main{display:grid;grid-template-columns:minmax(290px,350px) minmax(0,1fr);height:calc(100vh - 46px);min-height:0;overflow:hidden}
+aside,section{padding:10px;min-width:0;min-height:0}
+aside{background:#fff;border-right:1px solid #d8dee8;height:100%;max-height:none;overflow:auto;display:flex;flex-direction:column}
+aside>.panel:first-child{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+#nodes.nodes{flex:1 1 auto;min-height:0;max-height:none;overflow-x:hidden;overflow-y:auto}
 .panel{background:white;border:1px solid #d8dee8;border-radius:9px;padding:11px;margin-bottom:9px}
 h2{font-size:17px;margin:0 0 7px}
 h3{font-size:15px;margin:0 0 6px}
