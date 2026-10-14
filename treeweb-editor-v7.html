@@ -274,7 +274,70 @@ function dbOpen(){return new Promise((res,rej)=>{let q=indexedDB.open(DB,1);q.on
 async function dbSet(v){let db=await dbOpen();return new Promise((res,rej)=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,KEY);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>rej(tx.error)})}
 async function dbGet(){let db=await dbOpen();return new Promise((res,rej)=>{let q=db.transaction(STORE).objectStore(STORE).get(KEY);q.onsuccess=()=>{db.close();res(q.result)};q.onerror=()=>rej(q.error)})}
 async function save(){if(!prepareForSave())return false;await dbSet({version:1,baseCommit,headers,rows,selected,articles,baseArticles});notice();$('draftStatus').textContent='Esborrany desat localment al navegador. '+$('draftStatus').textContent}
-async function restore(ask=true){const d=await dbGet();if(!d)return;if(ask&&!confirm('Recuperar l’esborrany local?'))return;if(d.baseCommit!==baseCommit){$('draftStatus').textContent='L’esborrany correspon a una altra versió de GitHub. No s’ha aplicat automàticament. Desa’l/exporta’l abans de recarregar si el vols conservar.';return}const remoteRows=rows,remoteHeaders=headers,remoteRepairIds=repairedRootIds;try{if(!Array.isArray(d.rows)||!Array.isArray(d.headers))throw Error('format de l’esborrany invàlid');const requiredHeaders=['node_id','parent_id','title','level','order','node_type'];if(!requiredHeaders.every(h=>d.headers.includes(h)))throw Error('falten columnes obligatòries a l’esborrany');if(d.articles!==undefined&&(!d.articles||typeof d.articles!=='object'||Array.isArray(d.articles)))throw Error('mapa d’articles invàlid');if(d.baseArticles!==undefined&&(!d.baseArticles||typeof d.baseArticles!=='object'||Array.isArray(d.baseArticles)))throw Error('mapa d’articles base invàlid');rows=d.rows;headers=d.headers;repairedRootIds=repairOrphanRows();validateStructure();selected=d.selected||'';articles=d.articles||{};baseArticles=d.baseArticles||{};if(selected&&!rows.some(r=>nid(r)===selected))selected='';render();if(selected)select(selected);notice();$('draftStatus').textContent='Esborrany local recuperat i estructura validada. '+$('draftStatus').textContent}catch(e){rows=remoteRows;headers=remoteHeaders;repairedRootIds=remoteRepairIds;selected='';articles={};baseArticles={};formDirty=false;articleDirty=false;$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('articleBody').value='';render();$('draftStatus').className='status err';$('draftStatus').textContent='No s’ha aplicat l’esborrany local perquè l’estructura no és vàlida ('+e.message+'). Les dades remotes s’han mantingut. L’esborrany local continua guardat; prem «Recargar desde GitHub» si vols descartar-lo.'}}
+async function restore(ask=true){
+ const d=await dbGet();
+ if(!d)return;
+ if(ask&&!confirm('Recuperar l’esborrany local?'))return;
+ const live={baseRows,rows,headers,repairedRootIds,selected,baseCommit,baseTree,files,articles,baseArticles,formDirty,articleDirty,activeArticlePath};
+ try{
+  if(!Array.isArray(d.rows)||!Array.isArray(d.headers))throw Error('format de l’esborrany invàlid');
+  const requiredHeaders=['node_id','parent_id','title','level','order','node_type'];
+  if(!requiredHeaders.every(h=>d.headers.includes(h)))throw Error('falten columnes obligatòries a l’esborrany');
+  if(d.articles!==undefined&&(!d.articles||typeof d.articles!=='object'||Array.isArray(d.articles)))throw Error('mapa d’articles invàlid');
+  if(d.baseArticles!==undefined&&(!d.baseArticles||typeof d.baseArticles!=='object'||Array.isArray(d.baseArticles)))throw Error('mapa d’articles base invàlid');
+  let draftBaseRows=live.baseRows,draftBaseTree=live.baseTree,draftFiles=live.files;
+  const staleDraft=!!d.baseCommit&&d.baseCommit!==live.baseCommit;
+  if(staleDraft){
+   // Reconstruct the draft's original baseline from its saved commit so the
+   // publish step can perform a real three-way merge against the current branch.
+   const oldCommit=await api('/git/commits/'+d.baseCommit);
+   if(!oldCommit.tree||!oldCommit.tree.sha)throw Error('no es pot recuperar el commit base de l’esborrany');
+   const oldTree=await api('/git/trees/'+oldCommit.tree.sha+'?recursive=1');
+   if(oldTree.truncated)throw Error('l’arbre de fitxers de la versió base està truncat');
+   draftFiles=oldTree.tree.filter(x=>x.type==='blob');
+   const oldCsv=draftFiles.find(x=>x.path===CSV);
+   if(!oldCsv)throw Error('no es troba TREEWEB.csv a la versió base de l’esborrany');
+   const latestHeaders=[...headers];
+   const oldBlob=await api('/git/blobs/'+oldCsv.sha);
+   headers=[];
+   draftBaseRows=parseCSV(decode(oldBlob.content||''));
+   const oldHeaders=[...headers];
+   headers=latestHeaders;
+   if(oldHeaders.join('\u0000')!==d.headers.join('\u0000'))throw Error('les columnes de la versió base no coincideixen amb les de l’esborrany');
+   if(latestHeaders.join('\u0000')!==d.headers.join('\u0000'))throw Error('les columnes de GitHub han canviat; cal revisar l’esquema abans de fusionar');
+   draftBaseTree=oldCommit.tree.sha;
+  }else if(d.baseCommit!==live.baseCommit){
+   throw Error('l’esborrany no conté el commit base necessari per fer una fusió segura');
+  }
+  rows=d.rows.map(r=>({...r}));
+  headers=[...d.headers];
+  baseRows=draftBaseRows.map(r=>({...r}));
+  if(staleDraft){baseCommit=d.baseCommit;baseTree=draftBaseTree;files=draftFiles}
+  repairedRootIds=repairOrphanRows();
+  validateStructure();
+  selected=d.selected||'';
+  articles=d.articles||{};
+  baseArticles=d.baseArticles||{};
+  formDirty=false;articleDirty=false;activeArticlePath='';
+  if(selected&&!rows.some(r=>nid(r)===selected))selected='';
+  render();
+  if(selected)select(selected);
+  notice();
+  if(staleDraft){
+   $('draftStatus').className='status warn';
+   $('draftStatus').textContent='Esborrany local recuperat de la versió '+d.baseCommit.slice(0,7)+'. Encara NO està publicat. «Guardar en GitHub» intentarà fusionar els canvis amb la branca actual i aturarà l’operació si detecta conflictes.';
+  }else{
+   $('draftStatus').textContent='Esborrany local recuperat i estructura validada. '+$('draftStatus').textContent;
+  }
+ }catch(e){
+  baseRows=live.baseRows;rows=live.rows;headers=live.headers;repairedRootIds=live.repairedRootIds;selected=live.selected;baseCommit=live.baseCommit;baseTree=live.baseTree;files=live.files;articles=live.articles;baseArticles=live.baseArticles;formDirty=live.formDirty;articleDirty=live.articleDirty;activeArticlePath=live.activeArticlePath;
+  if(selected&&!rows.some(r=>nid(r)===selected))selected='';
+  $('form').classList.add('hidden');$('empty').classList.remove('hidden');$('articleBody').value='';
+  render();
+  $('draftStatus').className='status err';
+  $('draftStatus').textContent='No s’ha aplicat l’esborrany local: '+e.message+'. L’esborrany guardat continua al navegador i NO s’ha eliminat.';
+ }
+}
 async function discard(){if(!confirm('Eliminar l’esborrany local? No modifica GitHub.'))return;let db=await dbOpen();await new Promise((res,rej)=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close();rows=baseRows.map(r=>({...r}));articles={};selected='';$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('articleBody').value='';render();notice()}
 function validateStructure(){for(const [id,parent,type] of [['WEBTREE-ROOT','','CONTAINER'],['WEBTREE-TREE1','WEBTREE-ROOT','TREE'],['WEBTREE-TREE2','WEBTREE-ROOT','TREE']]){const r=rows.find(x=>nid(x)===id);if(!r)throw Error('Falta el node estructural obligatori '+id);if(par(r)!==parent||String(r.node_type||'').toUpperCase()!==type||String(r.level||'').toUpperCase()!=='ROOT')throw Error('S’ha alterat l’estructura protegida de '+id+'. No es publicarà.')}let ids=new Set();for(let r of rows){if(!nid(r)||ids.has(nid(r)))throw Error('ID buit o duplicat: '+nid(r));ids.add(nid(r));if(!label(r).trim())throw Error('Node sense títol: '+nid(r));if(nid(r)!=='WEBTREE-ROOT'&&!par(r))throw Error('El node '+label(r)+' ha quedat fora de TreeWeb. Mou-lo sota «TreeWeb · arrel» abans de publicar.')}for(let r of rows){if(par(r)&&!ids.has(par(r)))throw Error('Pare inexistent '+par(r)+' al node '+nid(r));if(cycle(nid(r),par(r)))throw Error('Cicle detectat al node '+nid(r))}}
 function validate(){validateStructure();for(let p of Object.keys(articles))if(!/\.md$/i.test(p)||p.startsWith('/')||p.split('/').includes('..')||!/^(TREEWEB_ARTICLES|01_LIBRARY\/ARTICLES_CURRENT|01_LIBRARY\/ARTICLES_TREEREV1|01_LIBRARY\/ARTICLES_V3|LIBRARY_WEB\/articles)\//i.test(p))throw Error('Ruta Markdown no vàlida o no autoritzada: '+p)}
