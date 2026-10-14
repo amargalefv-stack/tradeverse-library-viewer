@@ -64,8 +64,9 @@ function recalcSubtree(id){
  const byId=new Map(rows.map(r=>[nid(r),r])),children=new Map();
  rows.forEach(r=>{const p=par(r);if(p&&byId.has(p)){if(!children.has(p))children.set(p,[]);children.get(p).push(r)}});
  const visited=new Set();
- function walk(r){if(!r||visited.has(nid(r)))return;visited.add(nid(r));const p=byId.get(par(r));
-  if(!p){const kind=String(r.node_type||'').toUpperCase();r.level=(['ROOT','TREE','CONTAINER'].includes(kind)||r.level==='ROOT')?'ROOT':'N1'}
+ function walk(r){if(!r||visited.has(nid(r)))return;visited.add(nid(r));const p=byId.get(par(r)),kind=String(r.node_type||'').toUpperCase();
+  if(['ROOT','TREE','CONTAINER'].includes(kind))r.level='ROOT';
+  else if(!p)r.level='N1';
   else{const match=String(p.level||'').match(/^N(\d+)$/i);r.level='N'+((match?Number(match[1]):0)+1)}
   (children.get(nid(r))||[]).forEach(walk)
  }
@@ -74,7 +75,7 @@ function recalcSubtree(id){
 function siblingList(parent,idToExclude=''){return rows.filter(r=>par(r)===parent&&nid(r)!==idToExclude).sort((a,b)=>(Number(a.order)||999999)-(Number(b.order)||999999)||label(a).localeCompare(label(b)))}
 function renumber(list){list.forEach((r,i)=>r.order=String(i+1))}
 
-function applyNode(){let r=rows.find(x=>nid(x)===selected);if(!r)return false;let p=$('parent').value,t=$('title').value.trim();if(!t){alert('El títol és obligatori.');return false}if(cycle(selected,p)){alert('El pare escollit crearia un cicle.');return false}const oldParent=par(r);Object.assign(r,{title:t,parent_id:p,level:$('level').value.trim(),order:$('order').value.trim(),node_type:$('type').value.trim(),status:$('status').value.trim(),article_id:$('article_id').value.trim(),article_file:$('article_file').value.trim(),article_status:$('article_status').value.trim(),scope:$('scope').value,notes:$('notes').value});if(oldParent!==p)recalcSubtree(selected);formDirty=false;render();select(selected);notice();return true}
+function applyNode(){let r=rows.find(x=>nid(x)===selected);if(!r)return false;let p=$('parent').value,t=$('title').value.trim();if(!t){alert('El títol és obligatori.');return false}if(cycle(selected,p)){alert('El pare escollit crearia un cicle.');return false}const oldParent=par(r),oldType=r.node_type;Object.assign(r,{title:t,parent_id:p,level:$('level').value.trim(),order:$('order').value.trim(),node_type:$('type').value.trim(),status:$('status').value.trim(),article_id:$('article_id').value.trim(),article_file:$('article_file').value.trim(),article_status:$('article_status').value.trim(),scope:$('scope').value,notes:$('notes').value});if(oldParent!==p||oldType!==r.node_type)recalcSubtree(selected);formDirty=false;render();select(selected);notice();return true}
 function moveNode(id,targetId,zone='inside'){
  if(!prepareForSave())return false;const r=rows.find(x=>nid(x)===id),target=rows.find(x=>nid(x)===targetId);if(!r||!target)return false;
  if(cycle(id,targetId)){alert(zone==='inside'?'No es pot moure un node dins de si mateix o d’un dels seus descendents.':'No es pot ordenar un node abans o després d’un dels seus descendents.');return false}
