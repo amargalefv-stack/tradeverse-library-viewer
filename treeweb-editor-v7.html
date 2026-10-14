@@ -103,23 +103,41 @@ function repairOrphanRows(){
 }
 function articleKey(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function resolveTreewebArticle(r){
- const direct=String(r.article_file||'').trim();if(direct)return direct;
+ const direct=String(r.article_file||'').trim();
+ if(direct)return direct;
  const md=files.filter(f=>f.type==='blob'&&f.path.startsWith('TREEWEB_ARTICLES/')&&/\.md$/i.test(f.path));
  const id=nid(r).toLowerCase(),slugKey=articleKey(r.web_slug||r.title),titleKey=articleKey(r.title);
  if(!slugKey&&!titleKey)return '';
  const idMatches=md.filter(f=>f.path.split('/').pop().toLowerCase().startsWith(id+'_'));
  if(idMatches.length){idMatches.sort((a,b)=>a.path.length-b.path.length);return idMatches[0].path}
- const matches=md.filter(f=>{const name=articleKey(f.path.split('/').pop().replace(/\.md$/i,''));return name===slugKey||name===titleKey});
- if(!matches.length)return '';
- const score=f=>{
-  let n=0;const path=f.path,parts=path.split('/'),name=articleKey(parts[parts.length-1].replace(/\.md$/i,''));
-  if(name===slugKey)n+=100;if(name===titleKey)n+=90;
+ const filename=f=>f.path.split('/').pop().replace(/\.md$/i,'');
+ const exact=md.filter(f=>{const name=articleKey(filename(f));return name===slugKey||name===titleKey});
+ const scorePath=f=>{
+  let n=0;const path=f.path,parts=path.split('/'),name=articleKey(filename(f));
+  if(name===slugKey)n+=1000;if(name===titleKey)n+=900;
   if(String(r.level||'').toUpperCase()==='N1'&&/\/00_N1\//i.test(path))n+=80;
   if(parts.slice(1,-1).some(part=>articleKey(part)===slugKey))n+=25;
   return n;
  };
- matches.sort((a,b)=>score(b)-score(a)||a.path.length-b.path.length);
- return matches[0].path
+ if(exact.length){exact.sort((a,b)=>scorePath(b)-scorePath(a)||a.path.length-b.path.length);return exact[0].path}
+ // Titles can legitimately be broader than an existing canonical filename
+ // (e.g. node "...inversión, especulación y apuesta" vs article
+ // "TRADING_INVERSION_Y_ESPECULACION.md"). Resolve only strong, unique matches.
+ const stop=new Set(['a','al','con','de','del','el','ella','en','es','la','las','lo','los','o','para','por','que','se','su','y','un','una','unos','unas']);
+ const tokens=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().match(/[a-z0-9]+/g)?.filter(t=>t.length>1&&!stop.has(t))||[];
+ const target=new Set([...tokens(r.web_slug||''),...tokens(r.web_title||''),...tokens(r.title||'')]);
+ if(!target.size)return '';
+ const scored=md.map(f=>{
+  const candidate=new Set(tokens(filename(f)));
+  const common=[...target].filter(t=>candidate.has(t)).length;
+  const targetCoverage=common/target.size,candidateCoverage=common/Math.max(1,candidate.size);
+  return {f,score:targetCoverage+candidateCoverage,targetCoverage,candidateCoverage,common};
+ }).filter(x=>x.targetCoverage>=0.6&&x.candidateCoverage>=0.7&&x.common>=2)
+   .sort((a,b)=>b.score-a.score||b.common-a.common||a.f.path.localeCompare(b.f.path));
+ if(!scored.length)return '';
+ const best=scored[0],second=scored[1];
+ if(second&&Math.abs(best.score-second.score)<0.12)return '';
+ return best.f.path;
 }
 async function load(){const previousSelected=selected;const ref=await api('/git/ref/heads/'+BRANCH);baseCommit=ref.object.sha;const cm=await api('/git/commits/'+baseCommit);baseTree=cm.tree.sha;const tr=await api('/git/trees/'+baseTree+'?recursive=1');if(tr.truncated)throw Error('GitHub ha retornat un arbre de fitxers truncat. Aturo per seguretat.');files=tr.tree.filter(x=>x.type==='blob');const f=files.find(x=>x.path===CSV);if(!f)throw Error('No es troba '+CSV);const bl=await api('/git/blobs/'+f.sha);headers=[];baseRows=parseCSV(decode(bl.content||''));rows=baseRows.map(r=>({...r}));repairedRootIds=repairOrphanRows();selected='';formDirty=false;articleDirty=false;activeArticlePath='';articles={};baseArticles={};expandedNodes.clear();treeInitialized=false;$('articleBody').value='';$('search').value='';$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('conn').textContent='Connectat · '+BRANCH;$('login').classList.add('hidden');$('app').classList.remove('hidden');render();await restore(false);if(repairedRootIds.length){select(repairedRootIds[0]);notice();$('draftStatus').textContent='Correcció pendent: '+repairedRootIds.length+' node(s) reubicat(s) directament sota TreeWeb. Els descendents s’han conservat. Prem «Guardar en GitHub» per desar la correcció.'}else if(!selected&&previousSelected&&rows.some(r=>nid(r)===previousSelected))select(previousSelected);else if(!selected){const directRootNodes=rows.filter(r=>par(r)==='WEBTREE-ROOT'&&!structuralRule(nid(r))&&rows.some(ch=>par(ch)===nid(r)));if(directRootNodes.length===1)select(nid(directRootNodes[0]))}}
 function render(){
