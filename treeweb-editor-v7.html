@@ -209,55 +209,8 @@ async function discard(){if(!confirm('Eliminar l’esborrany local? No modifica 
 function validateStructure(){for(const [id,parent,type] of [['WEBTREE-ROOT','','CONTAINER'],['WEBTREE-TREE1','WEBTREE-ROOT','TREE'],['WEBTREE-TREE2','WEBTREE-ROOT','TREE']]){const r=rows.find(x=>nid(x)===id);if(!r)throw Error('Falta el node estructural obligatori '+id);if(par(r)!==parent||String(r.node_type||'').toUpperCase()!==type||String(r.level||'').toUpperCase()!=='ROOT')throw Error('S’ha alterat l’estructura protegida de '+id+'. No es publicarà.')}let ids=new Set();for(let r of rows){if(!nid(r)||ids.has(nid(r)))throw Error('ID buit o duplicat: '+nid(r));ids.add(nid(r));if(!label(r).trim())throw Error('Node sense títol: '+nid(r));if(nid(r)!=='WEBTREE-ROOT'&&!par(r))throw Error('El node '+label(r)+' ha quedat fora de TreeWeb. Mou-lo sota «TreeWeb · arrel» abans de publicar.')}for(let r of rows){if(par(r)&&!ids.has(par(r)))throw Error('Pare inexistent '+par(r)+' al node '+nid(r));if(cycle(nid(r),par(r)))throw Error('Cicle detectat al node '+nid(r))}}
 function validate(){validateStructure();for(let p of Object.keys(articles))if(!/\.md$/i.test(p)||p.startsWith('/')||p.split('/').includes('..')||!/^(TREEWEB_ARTICLES|01_LIBRARY\/ARTICLES_CURRENT|01_LIBRARY\/ARTICLES_TREEREV1|01_LIBRARY\/ARTICLES_V3|LIBRARY_WEB\/articles)\//i.test(p))throw Error('Ruta Markdown no vàlida o no autoritzada: '+p)}
 
-async function publish(){
- if(!prepareForSave())return;
- let d=diff(),paths=d.art;
- if(!d.add.length&&!d.mod.length&&!d.del.length&&!paths.length){alert('No hi ha canvis per guardar a GitHub.');return}
- const unbased=paths.filter(p=>files.some(f=>f.path===p)&&!Object.prototype.hasOwnProperty.call(baseArticles,p));
- if(unbased.length){alert('Abans de publicar, carrega des de GitHub aquests articles per evitar sobreescriure contingut existent sense revisar-lo:\n'+unbased.join('\n'));return}
- if(!confirm('Guardar els canvis a GitHub, branca TREEWEB01?'))return;
- let box=$('publishStatus'),publishedSha='';
- box.className='status';box.classList.remove('hidden');box.textContent='Validant i publicant…';$('publish').disabled=true;
- try{
-  validate();
-  // Safe rebase: allow unrelated remote commits, but never overwrite a changed CSV/article.
-  let ref=await api('/git/ref/heads/'+BRANCH);
-  if(ref.object.sha!==baseCommit){
-   box.textContent='La branca ha avançat. Comprovant conflictes abans de publicar…';
-   const latestCommit=await api('/git/commits/'+ref.object.sha);
-   const latestTree=await api('/git/trees/'+latestCommit.tree.sha+'?recursive=1');
-   if(latestTree.truncated)throw Error('L’arbre remot és massa gran per validar-lo amb seguretat. No s’ha publicat res.');
-   const latestFiles=latestTree.tree.filter(x=>x.type==='blob');
-   const oldCsv=files.find(f=>f.path===CSV),newCsv=latestFiles.find(f=>f.path===CSV);
-   if(!oldCsv||!newCsv||oldCsv.sha!==newCsv.sha)throw Error('CONFLICTE: TREEWEB.csv ha canviat a GitHub des que has carregat l’editor. No s’ha publicat res. Cal recarregar i revisar l’arbre.');
-   const conflicts=[];
-   for(const p of paths){
-    const oldFile=files.find(f=>f.path===p),newFile=latestFiles.find(f=>f.path===p);
-    if((oldFile?.sha||null)!==(newFile?.sha||null))conflicts.push(p);
-   }
-   if(conflicts.length)throw Error('CONFLICTE: aquests articles han canviat a GitHub des que has carregat l’editor. No s’ha publicat res per evitar sobreescriure’ls:\n'+conflicts.join('\n'));
-   baseCommit=ref.object.sha;baseTree=latestCommit.tree.sha;files=latestFiles;
-  }
-  const entries=[];
-  const b=await api('/git/blobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:makeCSV(),encoding:'utf-8'})});
-  entries.push({path:CSV,mode:'100644',type:'blob',sha:b.sha});
-  for(const p of paths){
-   const x=await api('/git/blobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:articles[p],encoding:'utf-8'})});
-   entries.push({path:p,mode:'100644',type:'blob',sha:x.sha});
-  }
-  const t=await api('/git/trees',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_tree:baseTree,tree:entries})});
-  const c=await api('/git/commits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Edit TREEWEB nodes and articles from draft editor',tree:t.sha,parents:[baseCommit]})});
-  await api('/git/refs/heads/'+BRANCH,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({sha:c.sha,force:false})});
-  publishedSha=c.sha;box.className='status ok';box.textContent='Commit publicat: '+publishedSha+'. Verificant les dades…';
-  await load();
-  await discardDraftAfterPublish();
-  box.className='status ok';box.textContent='Publicat i recarregat correctament. Commit: '+publishedSha;
- }catch(e){
-  if(publishedSha){box.className='status warn';box.textContent='El commit '+publishedSha+' s’ha publicat, però no s’ha pogut completar la recàrrega de verificació: '+e.message+' L’esborrany local no s’ha eliminat.'}
-  else{box.className='status err';box.textContent='No s’ha publicat res: '+e.message+' L’esborrany local s’ha conservat.'}
- }finally{$('publish').disabled=false;review()}
-}
-async function reloadFromGithub(){const d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length,stored=await dbGet();if(!confirm(n||formDirty||articleDirty||stored?'Recarregar des de GitHub descartarà tots els canvis de pantalla i l’esborrany local guardat. Cancel·la per conservar-los. Continuar?':'Recarregar les dades actuals des de GitHub?'))return;try{await load();await discardDraftAfterPublish();$('publishStatus').className='status ok';$('publishStatus').classList.remove('hidden');$('publishStatus').textContent='Dades recarregades des de GitHub ('+baseCommit.slice(0,7)+').'}catch(e){$('publishStatus').className='status err';$('publishStatus').classList.remove('hidden');$('publishStatus').textContent='No s’ha pogut recarregar: '+e.message+' L’esborrany local no s’ha eliminat.'}}
+async function publish(){if(!prepareForSave())return;let d=diff(),paths=d.art;if(!d.add.length&&!d.mod.length&&!d.del.length&&!paths.length){alert('No hi ha canvis per guardar a GitHub.');return}const unbased=paths.filter(p=>files.some(f=>f.path===p)&&!Object.prototype.hasOwnProperty.call(baseArticles,p));if(unbased.length){alert('Abans de publicar, carrega des de GitHub aquests articles per evitar sobreescriure contingut existent sense revisar-lo:\n'+unbased.join('\n'));return}if(!confirm('Guardar els canvis a GitHub, branca TREEWEB01?'))return;let box=$('publishStatus'),publishedSha='';box.className='status';box.classList.remove('hidden');box.textContent='Validant i publicant…';$('publish').disabled=true;try{validate();let ref=await api('/git/ref/heads/'+BRANCH);if(ref.object.sha!==baseCommit)throw Error('La branca ha canviat des de la càrrega. No s’ha publicat res; recarrega i torna a revisar.');let entries=[];const csv=makeCSV();let b=await api('/git/blobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:csv,encoding:'utf-8'})});entries.push({path:CSV,mode:'100644',type:'blob',sha:b.sha});for(let p of paths){let x=await api('/git/blobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:articles[p],encoding:'utf-8'})});entries.push({path:p,mode:'100644',type:'blob',sha:x.sha})}let t=await api('/git/trees',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_tree:baseTree,tree:entries})});let c=await api('/git/commits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Edit TREEWEB nodes and articles from draft editor',tree:t.sha,parents:[baseCommit]})});await api('/git/refs/heads/'+BRANCH,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({sha:c.sha,force:false})});publishedSha=c.sha;box.className='status ok';box.textContent='Commit publicat: '+publishedSha+'. Verificant les dades…';await discardDraftAfterPublish();await load();box.className='status ok';box.textContent='Publicat i recarregat correctament. Commit: '+publishedSha}catch(e){if(publishedSha){box.className='status warn';box.textContent='El commit '+publishedSha+' s’ha publicat, però no s’ha pogut completar la recàrrega de verificació: '+e.message}else{box.className='status err';box.textContent='No s’ha pogut confirmar la publicació: '+e.message+' Revisa l’estat de GitHub abans de repetir.'}}finally{$('publish').disabled=false;review()}}
+async function reloadFromGithub(){const d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length,stored=await dbGet();if(!confirm(n||formDirty||articleDirty||stored?'Recarregar des de GitHub descartarà tots els canvis de pantalla i l’esborrany local guardat. Cancel·la per conservar-los. Continuar?':'Recarregar les dades actuals des de GitHub?'))return;try{await discardDraftAfterPublish();await load();$('publishStatus').className='status ok';$('publishStatus').classList.remove('hidden');$('publishStatus').textContent='Dades recarregades des de GitHub ('+baseCommit.slice(0,7)+').'}catch(e){$('publishStatus').className='status err';$('publishStatus').classList.remove('hidden');$('publishStatus').textContent='No s’ha pogut recarregar: '+e.message}}
 async function discardDraftAfterPublish(){let db=await dbOpen();await new Promise(res=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=res});db.close();articles={};baseArticles={}}
 $('connect').onclick=async()=>{token=$('token').value.trim();if(!token)return;$('loginStatus').classList.remove('hidden');$('loginStatus').textContent='Connectant…';sessionStorage.setItem('tradeverse_editor_token',token);sessionStorage.setItem('tradeverse_treeweb_token',token);try{await load()}catch(e){$('loginStatus').textContent='Error: '+e.message}};
 $('forget').onclick=()=>{token='';sessionStorage.removeItem('tradeverse_editor_token');sessionStorage.removeItem('tradeverse_treeweb_token');$('token').value=''};
