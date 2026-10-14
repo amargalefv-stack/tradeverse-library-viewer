@@ -67,11 +67,11 @@ button:hover{background:#edf2f7}
 @media(max-width:800px){main{grid-template-columns:1fr}aside{max-height:none;border-right:0;border-bottom:1px solid #d8dee8}.nodes{max-height:50vh;min-height:140px}.grid{grid-template-columns:1fr}aside,section{padding:8px}}
 </style>
 <body>
-<header><b>Tradeverse · Editor TREEWEB v7</b><span class="tag">TREEWEB01</span><span id="conn" class="tag">Sense connexió</span><button id="saveDraft" class="primary">Guardar en local</button><button id="publish" class="primary">Guardar en GitHub</button><button id="reloadGithub">Recargar desde GitHub</button><button id="newRoot" class="header-action">Nou arrel</button><button id="newChild" class="header-action">Nou fill</button></header><div id="publishStatus" class="status hidden" style="margin:8px 16px"></div>
+<header><b>Tradeverse · Editor TREEWEB v7</b><span class="tag">TREEWEB01</span><span id="conn" class="tag">Sense connexió</span><button id="saveDraft" class="primary" title="Desa només una còpia al navegador; no la publica">Desar local</button><button id="publish" class="primary" title="Publica els canvis a la branca TREEWEB01 de GitHub">Publicar a GitHub</button><button id="reloadGithub" title="Carrega la versió remota; pot substituir canvis locals">Carregar GitHub</button><button id="newRoot" class="header-action">Nou arrel</button><button id="newChild" class="header-action">Nou fill</button></header><div id="publishStatus" class="status hidden" style="margin:8px 16px"></div>
 <div id="login" class="panel" style="max-width:680px;margin:24px auto"><h2>Connectar amb GitHub</h2><p>Llegeix <b>TREEWEB.csv</b> de <code>amargalefv-stack/tradeverse-project-master</code>, branca <code>TREEWEB01</code>. Els canvis només s'envien a GitHub quan prems «Guardar en GitHub».</p><label>Token de GitHub<input id="token" type="password" autocomplete="off" placeholder="github_pat_…"></label><p class="small">Cal permís de lectura i escriptura al repositori privat. El token es guarda només a la sessió del navegador.</p><div class="row"><button id="connect" class="primary">Connectar i carregar</button><button id="forget">Esborrar token</button></div><div id="loginStatus" class="status hidden"></div></div>
 <main id="app" class="hidden"><aside>
 <div class="panel"><h3>Nodes</h3><input id="search" placeholder="Cerca per títol o ID"><div id="counts" class="small"></div><div id="rootDrop" class="root-drop">Arrel de TreeWeb: moure fora de Tree1/Tree2 · conservar fills</div><div id="nodes" class="nodes"></div></div>
-<div class="panel"><h3>Estat</h3><div id="draftStatus" class="status">Sense canvis locals.</div><p class="small">Fes servir els tres botons de dalt: guardar en local, guardar a GitHub o recarregar des de GitHub.</p></div>
+<div class="panel"><h3>Estat</h3><div id="draftStatus" class="status">Sense canvis locals.</div><p class="small"><b>DESAR LOCAL</b>: còpia només en aquest navegador; no es publica. <b>PUBLICAR A GITHUB</b>: envia els canvis a la branca TREEWEB01. <b>CARREGAR GITHUB</b>: substitueix la vista per la versió remota i només elimina l’esborrany després de verificar la càrrega. No facis una altra acció mentre hi hagi una operació en curs.</p></div>
 </aside><section>
 <div class="panel"><h2>Editar node</h2><p class="small">Selecciona un node per editar-lo. Clicar no tanca les branques. Mou-lo amb arrossegar (zona central = fer fill; vora superior/inferior = ordenar entre germans) o amb els controls de moviment de sota. Aplica primer els canvis del formulari abans de moure’l.</p><div id="empty">Selecciona un node o crea'n un de nou.</div><div id="form" class="hidden"><div class="move-tools"><strong>Moure el node seleccionat</strong><div class="row"><button id="moveOutdent" title="Convertir-lo en germà del seu pare">↰ Pujar un nivell</button><button id="moveIndent" title="Fer-lo fill del germà anterior">↳ Baixar un nivell</button></div><div class="row"><button id="moveUp" title="Pujar dins del mateix nivell">↑ Amunt</button><button id="moveDown" title="Baixar dins del mateix nivell">↓ Avall</button></div><p class="small">Aquests controls no depenen de l’arrossegar i deixar anar.</p></div>
 <div class="grid"><label>ID<input id="id" readonly></label><label>Títol<input id="title"></label><label>Pare<select id="parent"></select></label><label>Nivell<input id="level" placeholder="N1, N2…"></label><label>Ordre<input id="order" type="number"></label><label>Tipus<input id="type"></label><label>Estat<input id="status"></label><label>ID article<input id="article_id"></label><label>Ruta article (.md)<input id="article_file" placeholder="TREEWEB_ARTICLES/article.md"></label><label>Estat article<input id="article_status"></label></div>
@@ -81,9 +81,14 @@ button:hover{background:#edf2f7}
 </section></main>
 <script>
 const OWNER='amargalefv-stack',REPO='tradeverse-project-master',BRANCH='TREEWEB01',CSV='TREEWEB.csv',DB='TradeverseTreewebDrafts',STORE='drafts',KEY='current';
-let token=sessionStorage.getItem('tradeverse_editor_token')||sessionStorage.getItem('tradeverse_treeweb_token')||'',headers=[],baseRows=[],rows=[],selected='',baseCommit='',baseTree='',files=[],articles={},baseArticles={},expandedNodes=new Set(),treeInitialized=false,formDirty=false,articleDirty=false,activeArticlePath='',articleLoadSeq=0,repairedRootIds=[];
+let token=sessionStorage.getItem('tradeverse_editor_token')||sessionStorage.getItem('tradeverse_treeweb_token')||'',headers=[],baseRows=[],rows=[],selected='',baseCommit='',baseTree='',files=[],articles={},baseArticles={},expandedNodes=new Set(),treeInitialized=false,formDirty=false,articleDirty=false,activeArticlePath='',articleLoadSeq=0,repairedRootIds=[],operationBusy=false;
 const $=id=>document.getElementById(id);$('token').value=token;
-function api(path,opts={}){return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+path,{...opts,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(opts.headers||{})}}).then(async r=>{let d;try{d=await r.json()}catch{d={}}if(!r.ok)throw Error(r.status+' '+(d.message||r.statusText));return d})}
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function beginOperation(){if(operationBusy){showVisibleStatus('warn','OPERACIÓ EN CURS · Espera que acabi abans de desar, publicar o carregar dades.');return false}operationBusy=true;['saveDraft','publish','reloadGithub'].forEach(id=>{const b=$(id);if(b)b.disabled=true});return true}
+function endOperation(){operationBusy=false;['saveDraft','publish','reloadGithub'].forEach(id=>{const b=$(id);if(b)b.disabled=false})}
+async function waitForStableHead(attempts=8,interval=700){let previous='';for(let i=0;i<attempts;i++){const ref=await api('/git/ref/heads/'+BRANCH);const sha=ref?.object?.sha;if(!sha)throw Error('GitHub no ha retornat la versió de la branca.');if(sha===previous)return sha;previous=sha;await delay(interval)}throw Error('La versió de GitHub encara està canviant o no s’ha estabilitzat. No he descartat l’esborrany; espera uns segons i torna-ho a provar.')}
+async function waitForHead(expectedSha,attempts=12,interval=500){for(let i=0;i<attempts;i++){const ref=await api('/git/ref/heads/'+BRANCH);if(ref?.object?.sha===expectedSha)return true;await delay(interval)}return false}
+function api(path,opts={}){return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+path,{...opts,cache:'no-store',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(opts.headers||{})}}).then(async r=>{let d;try{d=await r.json()}catch{d={}}if(!r.ok)throw Error(r.status+' '+(d.message||r.statusText));return d})}
 function decode(s){let b=atob(s.replace(/\s/g,''));return new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0)))}
 function parseCSV(s){let out=[],row=[],v='',q=false;for(let i=0;i<s.length;i++){let c=s[i];if(q){if(c==='"'&&s[i+1]==='"'){v+='"';i++}else if(c==='"')q=false;else v+=c}else if(c==='"')q=true;else if(c===','){row.push(v);v=''}else if(c==='\n'){row.push(v.replace(/\r$/,''));out.push(row);row=[];v=''}else v+=c}if(v||row.length){row.push(v.replace(/\r$/,''));out.push(row)}headers=out.shift()||[];return out.filter(a=>a.some(Boolean)).map(a=>Object.fromEntries(headers.map((h,i)=>[h,a[i]||''])))}
 function csvQuote(v){v=String(v??'');return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
@@ -139,9 +144,10 @@ function resolveTreewebArticle(r){
  if(second&&Math.abs(best.score-second.score)<0.12)return '';
  return best.f.path;
 }
-async function load(skipSavedDraft=false){
+async function load(skipSavedDraft=false,expectedHead=''){
  const previousSelected=selected;
  const ref=await api('/git/ref/heads/'+BRANCH);
+ if(expectedHead&&ref.object.sha!==expectedHead)throw Error('La branca ha canviat mentre es carregava. No he eliminat l’esborrany local. Torna-ho a provar.');
  baseCommit=ref.object.sha;
  const cm=await api('/git/commits/'+baseCommit);
  baseTree=cm.tree.sha;
@@ -293,9 +299,8 @@ function showVisibleStatus(kind,message){
  box.textContent=message;
 }
 async function save(){
- const button=$('saveDraft');
- button.disabled=true;
- showVisibleStatus('','Desant esborrany al navegador i verificant l’escriptura…');
+ if(!beginOperation())return;
+ showVisibleStatus('','DESANT EN LOCAL · Guardant una còpia en aquest navegador i verificant-la…');
  try{
   if(!prepareForSave()){
    showVisibleStatus('err','NO S’HA DESAT: hi ha un canvi al formulari o a l’article que no s’ha pogut aplicar. Revisa el missatge i torna-ho a provar.');
@@ -324,7 +329,7 @@ async function save(){
   showVisibleStatus('err','ERROR: NO S’HA POGUT CONFIRMAR EL DESAMENT LOCAL. '+(e?.message||String(e))+' No recarreguis la pàgina fins a resoldre-ho.');
   return false;
  }finally{
-  button.disabled=false;
+  endOperation();
  }
 }
 async function restore(ask=true){
@@ -396,14 +401,16 @@ function validateStructure(){for(const [id,parent,type] of [['WEBTREE-ROOT','','
 function validate(){validateStructure();for(let p of Object.keys(articles))if(!/\.md$/i.test(p)||p.startsWith('/')||p.split('/').includes('..')||!/^(TREEWEB_ARTICLES|01_LIBRARY\/ARTICLES_CURRENT|01_LIBRARY\/ARTICLES_TREEREV1|01_LIBRARY\/ARTICLES_V3|LIBRARY_WEB\/articles)\//i.test(p))throw Error('Ruta Markdown no vàlida o no autoritzada: '+p)}
 
 async function publish(){
+ if(operationBusy)return;
  if(!prepareForSave())return;
  let d=diff(),paths=d.art;
  if(!d.add.length&&!d.mod.length&&!d.del.length&&!paths.length){alert('No hi ha canvis per guardar a GitHub.');return}
  const unbased=paths.filter(p=>files.some(f=>f.path===p)&&!Object.prototype.hasOwnProperty.call(baseArticles,p));
  if(unbased.length){alert('Abans de publicar, carrega des de GitHub aquests articles per evitar sobreescriure contingut existent sense revisar-lo:\n'+unbased.join('\n'));return}
  if(!confirm('Guardar els canvis a GitHub, branca TREEWEB01?'))return;
+ if(!beginOperation())return;
  const box=$('publishStatus');let publishedSha='';
- box.className='status';box.classList.remove('hidden');box.textContent='Validant i publicant…';$('publish').disabled=true;
+ box.className='status';box.classList.remove('hidden');box.textContent='PUBLICANT A GITHUB · Validant els canvis. No carreguis GitHub fins que aparegui la confirmació…';
  try{
   validate();
   let ref=await api('/git/ref/heads/'+BRANCH);
@@ -476,27 +483,33 @@ async function publish(){
   const c=await api('/git/commits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Edit TREEWEB nodes and articles from draft editor',tree:t.sha,parents:[baseCommit]})});
   await api('/git/refs/heads/'+BRANCH,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({sha:c.sha,force:false})});
   publishedSha=c.sha;
-  box.className='status ok';box.textContent='Commit publicat: '+publishedSha+'. Verificant les dades…';
-  await load(true);
+  box.className='status';box.textContent='COMMIT CREAT · Esperant que TREEWEB01 apunti a '+publishedSha.slice(0,7)+'… No recarreguis la pàgina.';
+  const visible=await waitForHead(publishedSha);
+  if(!visible)throw Error('GitHub ha acceptat el commit '+publishedSha.slice(0,7)+' però encara no he pogut verificar que TREEWEB01 ja l’apunti. Espera uns segons i torna-ho a provar; l’esborrany local s’ha conservat.');
+  await load(true,publishedSha);
+  if(baseCommit!==publishedSha)throw Error('La lectura posterior no coincideix amb el commit publicat. L’esborrany local s’ha conservat.');
   await discardDraftAfterPublish();
-  box.className='status ok';box.textContent='Publicat, recarregat i verificat. Commit: '+publishedSha;
+  box.className='status ok';box.textContent='PUBLICAT A GITHUB I VERIFICAT · branca TREEWEB01 · commit '+publishedSha.slice(0,7)+' · '+rows.length.toLocaleString('ca-ES')+' nodes. Ja pots continuar treballant.';
  }catch(e){
   if(publishedSha){box.className='status warn';box.textContent='El commit '+publishedSha+' s’ha publicat, però la comprovació posterior ha fallat: '+e.message+' L’esborrany no s’ha eliminat.'}
   else{box.className='status err';box.textContent='No s’ha publicat res: '+e.message+' L’esborrany local s’ha conservat.'}
- }finally{$('publish').disabled=false;review()}
+ }finally{endOperation();review()}
 }
 async function reloadFromGithub(){
- const d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length,stored=await dbGet();
- if(!confirm(n||formDirty||articleDirty||stored?'Recarregar des de GitHub descartarà els canvis actuals i l’esborrany local després que la recàrrega funcioni. Continuar?':'Recarregar les dades actuals des de GitHub?'))return;
+ if(!beginOperation())return;
  try{
-  await load(true);
+  const d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length,stored=await dbGet();
+  if(!confirm(n||formDirty||articleDirty||stored?'CARREGAR DES DE GITHUB: substituirà els canvis visibles i eliminarà l’esborrany local només quan la càrrega s’hagi verificat. Assegura’t d’haver publicat abans. Continuar?':'Carregar i verificar la versió més recent de TREEWEB01 a GitHub?'))return;
+  showVisibleStatus('','COMPROVANT GITHUB · Esperant dues lectures consecutives de la mateixa versió…');
+  const targetHead=await waitForStableHead();
+  showVisibleStatus('','CARREGANT GITHUB · Versió '+targetHead.slice(0,7)+'…');
+  await load(true,targetHead);
+  if(baseCommit!==targetHead)throw Error('La versió carregada no coincideix amb la versió comprovada. L’esborrany local s’ha conservat.');
   await discardDraftAfterPublish();
-  $('publishStatus').className='status ok';$('publishStatus').classList.remove('hidden');
-  $('publishStatus').textContent='Dades recarregades des de GitHub ('+baseCommit.slice(0,7)+').';
+  showVisibleStatus('ok','GITHUB CARREGAT I VERIFICAT · branca TREEWEB01 · commit '+baseCommit.slice(0,7)+' · '+rows.length.toLocaleString('ca-ES')+' nodes. Aquesta acció no publica canvis.');
  }catch(e){
-  $('publishStatus').className='status err';$('publishStatus').classList.remove('hidden');
-  $('publishStatus').textContent='No s’ha pogut recarregar: '+e.message+' L’esborrany local s’ha conservat.';
- }
+  showVisibleStatus('err','NO S’HA POGUT VERIFICAR LA CÀRREGA: '+e.message+' L’esborrany local s’ha conservat.');
+ }finally{endOperation()}
 }
 async function discardDraftAfterPublish(){let db=await dbOpen();await new Promise(res=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=res});db.close();articles={};baseArticles={}}
 $('connect').onclick=async()=>{token=$('token').value.trim();if(!token)return;$('loginStatus').classList.remove('hidden');$('loginStatus').textContent='Connectant…';sessionStorage.setItem('tradeverse_editor_token',token);sessionStorage.setItem('tradeverse_treeweb_token',token);try{await load()}catch(e){$('loginStatus').textContent='Error: '+e.message}};
