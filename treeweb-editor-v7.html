@@ -399,7 +399,8 @@ async function restore(ask=true){
   notice();
   if(staleDraft){
    $('draftStatus').className='status warn';
-   $('draftStatus').textContent='Esborrany local recuperat de la versió '+d.baseCommit.slice(0,7)+'. Encara NO està publicat. «Guardar en GitHub» intentarà fusionar els canvis amb la branca actual i aturarà l’operació si detecta conflictes.';
+   $('draftStatus').textContent='ESBORRANY LOCAL ANTIC RECUPERAT de '+d.baseCommit.slice(0,7)+'. Encara NO està publicat. «Publicar a GitHub» intentarà fusionar els canvis amb la branca actual i aturarà l’operació si detecta conflictes.';
+   showVisibleStatus('warn','ESBORRANY LOCAL ANTIC RECUPERAT · Base '+d.baseCommit.slice(0,7)+' · '+d.rows.length.toLocaleString('ca-ES')+' nodes locals versus '+live.rows.length.toLocaleString('ca-ES')+' nodes a GitHub quan s’ha obert l’editor. Aquest esborrany conté diferències pròpies: revisa’l abans de publicar. La publicació provarà una fusió i conservarà l’esborrany si detecta conflictes.');
   }else{
    $('draftStatus').textContent='Esborrany local recuperat i estructura validada. '+$('draftStatus').textContent;
   }
