@@ -1,1 +1,268 @@
 <!doctype html>
+<html lang="ca"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tradeverse · Editor TREEWEB v7</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.32 system-ui,Arial,sans-serif;background:#f3f5f8;color:#182230}
+header{background:#111827;color:white;padding:9px 12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+header b{font-size:15px}
+.tag{background:#dbeafe;color:#1e40af;border-radius:16px;padding:3px 7px;font-size:11px}
+main{display:grid;grid-template-columns:minmax(290px,350px) minmax(0,1fr);min-height:calc(100vh - 46px)}
+aside,section{padding:10px;min-width:0}
+aside{background:#fff;border-right:1px solid #d8dee8;max-height:calc(100vh - 46px);overflow:auto}
+.panel{background:white;border:1px solid #d8dee8;border-radius:9px;padding:11px;margin-bottom:9px}
+h2{font-size:17px;margin:0 0 7px}
+h3{font-size:15px;margin:0 0 6px}
+p{margin:6px 0}
+label{display:block;font-size:13px;font-weight:500}
+input,select,textarea,button{font:inherit;border:1px solid #cbd5e1;border-radius:6px}
+input,select,textarea{width:100%;margin:3px 0 7px;background:#fff;padding:6px 7px;font-size:13px;min-width:0}
+textarea{min-height:72px;resize:vertical;line-height:1.35}
+button{background:white;cursor:pointer;padding:6px 8px;font-size:13px;line-height:1.25}
+button:hover{background:#edf2f7}
+.primary{background:#111827;color:white}
+.danger{color:#991b1b}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+.small{font-size:11px;color:#64748b}
+.status{padding:7px;background:#e8edf4;border-radius:7px;margin:7px 0;overflow-wrap:anywhere;font-size:12px}
+.ok{background:#dcfce7;color:#166534}
+.err{background:#fee2e2;color:#991b1b}
+.warn{background:#fef3c7;color:#92400e}
+.hidden{display:none!important}
+.nodes{max-height:calc(100vh - 265px);min-height:180px;overflow-x:hidden;overflow-y:auto}
+.node{display:block;width:100%;min-width:0;text-align:left;border:0;margin:1px 0;padding:4px 6px;line-height:1.2;overflow-wrap:anywhere;white-space:normal;font-size:12.5px}
+.node.active{background:#dbeafe;color:#1e3a8a}
+.node-row{display:flex;align-items:stretch;gap:2px;min-width:0}
+.drag-handle{cursor:grab;min-width:23px;padding:2px;border:0;background:transparent;color:#334155;user-select:none;font-size:16px;font-weight:700}
+.root-drop{user-select:none;border:2px dashed #94a3b8;border-radius:7px;padding:6px;text-align:center;color:#475569;font-size:11px;margin:5px 0}
+.root-drop.drop-target{background:#dbeafe;border-color:#2563eb}
+.delete-inline{padding:2px 5px;color:#991b1b;border:0;background:transparent}
+.drop-target{outline:2px dashed #2563eb;outline-offset:-2px;background:#eff6ff}
+.drop-before{box-shadow:inset 0 3px #2563eb;border-top:3px solid #2563eb;background:#eff6ff}
+.drop-after{box-shadow:inset 0 -3px #2563eb;border-bottom:3px solid #2563eb;background:#eff6ff}
+.move-tools{border-top:1px solid #e2e8f0;margin-top:9px;padding-top:8px}
+.move-tools strong{display:block;margin-bottom:5px;font-size:13px}
+.move-tools button{font-size:12px;padding:5px 6px}
+.meta{font-size:10px;color:#64748b;overflow-wrap:anywhere;line-height:1.15}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 9px}
+.code{font:11px/1.3 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.check{display:flex;gap:7px;align-items:flex-start}
+.check input{width:auto;margin-top:4px}
+#articleBody{min-height:min(300px,32vh)!important;font:12px/1.4 ui-monospace,monospace}
+@media(max-width:1200px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){main{grid-template-columns:1fr}aside{max-height:none;border-right:0;border-bottom:1px solid #d8dee8}.nodes{max-height:50vh;min-height:140px}.grid{grid-template-columns:1fr}aside,section{padding:8px}}
+</style>
+<body>
+<header><b>Tradeverse · Editor TREEWEB v7</b><span class="tag">TREEWEB01</span><span id="conn" class="tag">Sense connexió</span><button id="saveDraft" class="primary">Guardar en local</button><button id="publish" class="primary">Guardar en GitHub</button><button id="reloadGithub">Recargar desde GitHub</button></header><div id="publishStatus" class="status hidden" style="margin:8px 16px"></div>
+<div id="login" class="panel" style="max-width:680px;margin:24px auto"><h2>Connectar amb GitHub</h2><p>Llegeix <b>TREEWEB.csv</b> de <code>amargalefv-stack/tradeverse-project-master</code>, branca <code>TREEWEB01</code>. Els canvis només s'envien a GitHub quan prems «Guardar en GitHub».</p><label>Token de GitHub<input id="token" type="password" autocomplete="off" placeholder="github_pat_…"></label><p class="small">Cal permís de lectura i escriptura al repositori privat. El token es guarda només a la sessió del navegador.</p><div class="row"><button id="connect" class="primary">Connectar i carregar</button><button id="forget">Esborrar token</button></div><div id="loginStatus" class="status hidden"></div></div>
+<main id="app" class="hidden"><aside>
+<div class="panel"><h3>Nodes</h3><input id="search" placeholder="Cerca per títol o ID"><div id="counts" class="small"></div><div id="rootDrop" class="root-drop">Arrel de TreeWeb: moure fora de Tree1/Tree2 · conservar fills</div><div id="nodes" class="nodes"></div><div class="row"><button id="newRoot">Nou arrel</button><button id="newChild">Nou fill</button></div></div>
+<div class="panel"><h3>Estat</h3><div id="draftStatus" class="status">Sense canvis locals.</div><p class="small">Fes servir els tres botons de dalt: guardar en local, guardar a GitHub o recarregar des de GitHub.</p></div>
+</aside><section>
+<div class="panel"><h2>Editar node</h2><p class="small">Selecciona un node per editar-lo. Clicar no tanca les branques. Mou-lo amb arrossegar (zona central = fer fill; vora superior/inferior = ordenar entre germans) o amb els controls de moviment de sota. Aplica primer els canvis del formulari abans de moure’l.</p><div id="empty">Selecciona un node o crea'n un de nou.</div><div id="form" class="hidden"><div class="move-tools"><strong>Moure el node seleccionat</strong><div class="row"><button id="moveOutdent" title="Convertir-lo en germà del seu pare">↰ Pujar un nivell</button><button id="moveIndent" title="Fer-lo fill del germà anterior">↳ Baixar un nivell</button></div><div class="row"><button id="moveUp" title="Pujar dins del mateix nivell">↑ Amunt</button><button id="moveDown" title="Baixar dins del mateix nivell">↓ Avall</button></div><p class="small">Aquests controls no depenen de l’arrossegar i deixar anar.</p></div>
+<div class="grid"><label>ID<input id="id" readonly></label><label>Títol<input id="title"></label><label>Pare<select id="parent"></select></label><label>Nivell<input id="level" placeholder="N1, N2…"></label><label>Ordre<input id="order" type="number"></label><label>Tipus<input id="type"></label><label>Estat<input id="status"></label><label>ID article<input id="article_id"></label><label>Ruta article (.md)<input id="article_file" placeholder="TREEWEB_ARTICLES/article.md"></label><label>Estat article<input id="article_status"></label></div>
+<label>Àmbit<textarea id="scope"></textarea></label><label>Notes<textarea id="notes"></textarea></label><div class="row"><button id="applyNode" class="primary">Aplicar al esborrany</button><button id="deleteNode" class="danger">Eliminar node i descendents</button></div></div></div>
+<div class="panel"><h2>Article Markdown</h2><label>Contingut<textarea id="articleBody" style="min-height:300px;font-family:ui-monospace,monospace" placeholder="# Títol&#10;&#10;## Secció"></textarea></label><div class="row"><button id="loadArticle">Carregar de GitHub</button><button id="applyArticle" class="primary">Aplicar article a l'esborrany</button></div><div id="articleStatus" class="status">Selecciona un node amb ruta d'article.</div></div>
+
+</section></main>
+<script>
+const OWNER='amargalefv-stack',REPO='tradeverse-project-master',BRANCH='TREEWEB01',CSV='TREEWEB.csv',DB='TradeverseTreewebDrafts',STORE='drafts',KEY='current';
+let token=sessionStorage.getItem('tradeverse_editor_token')||sessionStorage.getItem('tradeverse_treeweb_token')||'',headers=[],baseRows=[],rows=[],selected='',baseCommit='',baseTree='',files=[],articles={},baseArticles={},expandedNodes=new Set(),treeInitialized=false,formDirty=false,articleDirty=false,activeArticlePath='',articleLoadSeq=0,repairedRootIds=[];
+const $=id=>document.getElementById(id);$('token').value=token;
+function api(path,opts={}){return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+path,{...opts,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(opts.headers||{})}}).then(async r=>{let d;try{d=await r.json()}catch{d={}}if(!r.ok)throw Error(r.status+' '+(d.message||r.statusText));return d})}
+function decode(s){let b=atob(s.replace(/\s/g,''));return new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0)))}
+function parseCSV(s){let out=[],row=[],v='',q=false;for(let i=0;i<s.length;i++){let c=s[i];if(q){if(c==='"'&&s[i+1]==='"'){v+='"';i++}else if(c==='"')q=false;else v+=c}else if(c==='"')q=true;else if(c===','){row.push(v);v=''}else if(c==='\n'){row.push(v.replace(/\r$/,''));out.push(row);row=[];v=''}else v+=c}if(v||row.length){row.push(v.replace(/\r$/,''));out.push(row)}headers=out.shift()||[];return out.filter(a=>a.some(Boolean)).map(a=>Object.fromEntries(headers.map((h,i)=>[h,a[i]||''])))}
+function csvQuote(v){v=String(v??'');return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function makeCSV(){let h=[...headers];if(rows.some(r=>r.article_file)&&!h.includes('article_file'))h.push('article_file');return h.join(',')+'\n'+rows.map(r=>h.map(k=>csvQuote(r[k])).join(',')).join('\n')+'\n'}
+function nid(r){return r.node_id||''}function par(r){return r.parent_id||''}function label(r){return r.title||nid(r)}function structuralRule(id){if(id==='WEBTREE-ROOT')return {parent:'',type:'CONTAINER'};if(id==='WEBTREE-TREE1'||id==='WEBTREE-TREE2')return {parent:'WEBTREE-ROOT',type:'TREE'};return null}
+function slug(s){return String(s||'article').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||'article'}
+function repairOrphanRows(){
+ const root=rows.find(r=>nid(r)==='WEBTREE-ROOT');
+ if(!root)return [];
+ const orphaned=rows.filter(r=>nid(r)!=='WEBTREE-ROOT'&&!par(r)&&!structuralRule(nid(r)));
+ if(!orphaned.length)return [];
+ const rootChildren=siblingList('WEBTREE-ROOT');
+ orphaned.forEach(r=>{r.parent_id='WEBTREE-ROOT';rootChildren.push(r)});
+ renumber(rootChildren);
+ orphaned.forEach(r=>recalcSubtree(nid(r)));
+ return orphaned.map(nid);
+}
+function articleKey(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
+function resolveTreewebArticle(r){
+ const direct=String(r.article_file||'').trim();if(direct)return direct;
+ const md=files.filter(f=>f.type==='blob'&&f.path.startsWith('TREEWEB_ARTICLES/')&&/\.md$/i.test(f.path));
+ const id=nid(r).toLowerCase(),slugKey=articleKey(r.web_slug||r.title),titleKey=articleKey(r.title);
+ if(!slugKey&&!titleKey)return '';
+ const idMatches=md.filter(f=>f.path.split('/').pop().toLowerCase().startsWith(id+'_'));
+ if(idMatches.length){idMatches.sort((a,b)=>a.path.length-b.path.length);return idMatches[0].path}
+ const matches=md.filter(f=>{const name=articleKey(f.path.split('/').pop().replace(/\.md$/i,''));return name===slugKey||name===titleKey});
+ if(!matches.length)return '';
+ const score=f=>{
+  let n=0;const path=f.path,parts=path.split('/'),name=articleKey(parts[parts.length-1].replace(/\.md$/i,''));
+  if(name===slugKey)n+=100;if(name===titleKey)n+=90;
+  if(String(r.level||'').toUpperCase()==='N1'&&/\/00_N1\//i.test(path))n+=80;
+  if(parts.slice(1,-1).some(part=>articleKey(part)===slugKey))n+=25;
+  return n;
+ };
+ matches.sort((a,b)=>score(b)-score(a)||a.path.length-b.path.length);
+ return matches[0].path
+}
+async function load(){const previousSelected=selected;const ref=await api('/git/ref/heads/'+BRANCH);baseCommit=ref.object.sha;const cm=await api('/git/commits/'+baseCommit);baseTree=cm.tree.sha;const tr=await api('/git/trees/'+baseTree+'?recursive=1');if(tr.truncated)throw Error('GitHub ha retornat un arbre de fitxers truncat. Aturo per seguretat.');files=tr.tree.filter(x=>x.type==='blob');const f=files.find(x=>x.path===CSV);if(!f)throw Error('No es troba '+CSV);const bl=await api('/git/blobs/'+f.sha);headers=[];baseRows=parseCSV(decode(bl.content||''));rows=baseRows.map(r=>({...r}));repairedRootIds=repairOrphanRows();selected='';formDirty=false;articleDirty=false;activeArticlePath='';articles={};baseArticles={};expandedNodes.clear();treeInitialized=false;$('articleBody').value='';$('search').value='';$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('conn').textContent='Connectat · '+BRANCH;$('login').classList.add('hidden');$('app').classList.remove('hidden');render();await restore(false);if(repairedRootIds.length){select(repairedRootIds[0]);notice();$('draftStatus').textContent='Correcció pendent: '+repairedRootIds.length+' node(s) reubicat(s) directament sota TreeWeb. Els descendents s’han conservat. Prem «Guardar en GitHub» per desar la correcció.'}else if(!selected&&previousSelected&&rows.some(r=>nid(r)===previousSelected))select(previousSelected);else if(!selected){const directRootNodes=rows.filter(r=>par(r)==='WEBTREE-ROOT'&&!structuralRule(nid(r))&&rows.some(ch=>par(ch)===nid(r)));if(directRootNodes.length===1)select(nid(directRootNodes[0]))}}
+function render(){
+ const q=$('search').value.trim().toLocaleLowerCase(),byId=new Map(rows.map(r=>[nid(r),r])),childMap=new Map();
+ rows.forEach(r=>{const p=par(r);if(p&&byId.has(p)){if(!childMap.has(p))childMap.set(p,[]);childMap.get(p).push(r)}});
+ const sortNodes=a=>a.sort((x,y)=>(Number(x.order)||999999)-(Number(y.order)||999999)||label(x).localeCompare(label(y)));
+ childMap.forEach(sortNodes);
+ const kids=id=>childMap.get(id)||[],roots=sortNodes(rows.filter(r=>!par(r)||!byId.has(par(r))));
+ $('nodes').replaceChildren();const visible=new Set();
+ if(q){rows.forEach(r=>{if((label(r)+' '+nid(r)).toLocaleLowerCase().includes(q)){let x=r,seen=new Set();while(x&&!seen.has(nid(x))){seen.add(nid(x));visible.add(nid(x));const p=byId.get(par(x));if(p)expandedNodes.add(nid(p));x=p}}})}else rows.forEach(r=>visible.add(nid(r)));
+ if(!treeInitialized){roots.forEach(r=>expandedNodes.add(nid(r)));treeInitialized=true}
+ function makeNode(r,depth){
+  if(!visible.has(nid(r)))return null;
+  const id=nid(r),wrap=document.createElement('div'),line=document.createElement('div'),childNodes=kids(id).filter(k=>visible.has(nid(k))),toggle=document.createElement('button'),handle=document.createElement('button'),b=document.createElement('button'),del=document.createElement('button');
+  wrap.dataset.nodeId=id;wrap.style.marginLeft=Math.min(depth,8)*8+'px';line.className='node-row';
+  toggle.style.cssText='padding:2px 5px;min-width:24px;border:0;background:transparent';toggle.textContent=childNodes.length?(q||expandedNodes.has(id)?'▾':'▸'):'·';toggle.disabled=!childNodes.length;
+  const protectedNode=!!structuralRule(id);handle.className='drag-handle';handle.textContent='↕';handle.title=protectedNode?'Node estructural protegit; mou els seus descendents':'Arrossega: centre = fer fill; vora superior/inferior = ordenar';handle.draggable=!protectedNode;handle.disabled=protectedNode;
+  handle.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move'});
+  b.className='node'+(id===selected?' active':'');b.style.flex='1';b.innerHTML='<b>'+esc(label(r))+'</b><div class="meta">'+esc(id)+' · nivell '+esc(r.level||'—')+'</div>';b.title='Selecciona el node; les branques obertes es conservaran.';b.onclick=()=>select(id);
+  del.className='delete-inline';del.textContent='×';del.title=protectedNode?'Node estructural protegit':'Eliminar node i descendents';del.disabled=protectedNode;del.setAttribute('aria-label','Eliminar '+label(r));del.onclick=e=>{e.stopPropagation();if(!select(id))return;removeNode()};
+  line.append(toggle,handle,b,del);wrap.append(line);
+  line.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';line.classList.remove('drop-before','drop-after','drop-target');const rect=line.getBoundingClientRect(),y=e.clientY-rect.top,zone=y<rect.height*.34?'before':y>rect.height*.66?'after':'inside';line.dataset.dropZone=zone;line.classList.add(zone==='before'?'drop-before':zone==='after'?'drop-after':'drop-target')});
+  line.addEventListener('dragleave',e=>{if(!line.contains(e.relatedTarget))line.classList.remove('drop-before','drop-after','drop-target')});
+  line.addEventListener('drop',e=>{e.preventDefault();line.classList.remove('drop-before','drop-after','drop-target');const dragged=e.dataTransfer.getData('text/plain');if(!dragged||dragged===id)return;moveNode(dragged,id,line.dataset.dropZone||'inside')});
+  if(childNodes.length){const group=document.createElement('div');group.className='node-children';const isOpen=!!q||expandedNodes.has(id);group.style.display=isOpen?'':'none';if(isOpen)childNodes.forEach(k=>{const el=makeNode(k,depth+1);if(el)group.append(el)});wrap.append(group);toggle.onclick=e=>{e.stopPropagation();const opening=group.style.display==='none';if(opening){expandedNodes.add(id);group.replaceChildren();childNodes.forEach(k=>{const el=makeNode(k,depth+1);if(el)group.append(el)});group.style.display='';toggle.textContent='▾'}else{expandedNodes.delete(id);group.replaceChildren();group.style.display='none';toggle.textContent='▸'}}}
+  return wrap
+ }
+ roots.forEach(r=>{const el=makeNode(r,0);if(el)$('nodes').append(el)});
+ $('counts').textContent=rows.length+' nodes · arbre jeràrquic';review()
+}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function select(id){if(id===selected&&(formDirty||articleDirty))return true;const changing=id!==selected;if(changing&&(formDirty||articleDirty)&&!confirm('Tens canvis no aplicats al formulari o a l’article. Vols descartar-los i seleccionar un altre node?'))return false;const keepArticle=!changing&&articleDirty,articleText=$('articleBody').value;formDirty=false;if(changing)articleDirty=false;selected=id;articleLoadSeq++;const r=rows.find(x=>nid(x)===id);if(!r)return false;let parentId=par(r),needsReveal=false,parentsSeen=new Set();if(rows.some(x=>par(x)===id)&&!expandedNodes.has(id)){expandedNodes.add(id);needsReveal=true}const parentById=new Map(rows.map(x=>[nid(x),x]));while(parentId&&!parentsSeen.has(parentId)){parentsSeen.add(parentId);if(!expandedNodes.has(parentId)){expandedNodes.add(parentId);needsReveal=true}parentId=par(parentById.get(parentId)||{})}if(needsReveal)render();$('empty').classList.add('hidden');$('form').classList.remove('hidden');for(const k of ['node_id','title','level','order','node_type','status','article_id','article_file','article_status','scope','notes'])$(k==='node_id'?'id':({'node_type':'type'}[k]||k)).value=r[k]||'';const resolvedArticlePath=resolveTreewebArticle(r);if(!String(r.article_file||'').trim()&&resolvedArticlePath)$('article_file').value=resolvedArticlePath;let p=$('parent');p.replaceChildren(new Option('TreeWeb · arrel','WEBTREE-ROOT'));rows.filter(x=>nid(x)!==id).sort((a,b)=>label(a).localeCompare(label(b))).forEach(x=>p.add(new Option(label(x)+' ['+nid(x)+']',nid(x))));p.value=par(r);const rule=structuralRule(id);p.disabled=!!rule;$('type').disabled=!!rule;$('level').disabled=!!rule;$('deleteNode').disabled=!!rule;const parentRow=rows.find(x=>nid(x)===par(r));const atTreeTop=parentRow&&String(parentRow.node_type||'').toUpperCase()==='TREE';$('moveOutdent').disabled=!!rule||!par(r)||!!atTreeTop;$('moveIndent').disabled=!!rule||(()=>{const a=siblingList(par(r)),i=a.findIndex(x=>nid(x)===id);return i<=0})();$('moveUp').disabled=(()=>{const a=siblingList(par(r)),i=a.findIndex(x=>nid(x)===id);return i<=0})();$('moveDown').disabled=(()=>{const a=siblingList(par(r)),i=a.findIndex(x=>nid(x)===id);return i<0||i>=a.length-1})();const selectedArticlePath=$('article_file').value.trim();if(keepArticle){$('articleBody').value=articleText}else{$('articleBody').value=articles[selectedArticlePath]??baseArticles[selectedArticlePath]??'';articleDirty=false;activeArticlePath=selectedArticlePath}
+if(selectedArticlePath){if(Object.prototype.hasOwnProperty.call(baseArticles,selectedArticlePath))$('articleStatus').textContent='Article carregat: '+selectedArticlePath;else{$('articleStatus').textContent='Carregant article de GitHub… '+selectedArticlePath;loadArticle(true,id).catch(e=>{if(selected===id)$('articleStatus').textContent='No s’ha pogut carregar l’article: '+e.message})}}else $('articleStatus').textContent='No s’ha trobat cap article publicat a TREEWEB_ARTICLES per aquest node. Pots indicar-ne la ruta al camp «Ruta article».';
+$('nodes').querySelectorAll('[data-node-id]').forEach(el=>{const btn=el.querySelector(':scope > .node-row > .node');if(btn)btn.classList.toggle('active',el.dataset.nodeId===id)});const siblings=siblingList(par(r)),pos=siblings.findIndex(x=>nid(x)===id),actualParent=rows.find(x=>nid(x)===par(r));$('moveOutdent').disabled=!!rule||!par(r)||!!(actualParent&&structuralRule(nid(actualParent)));$('moveIndent').disabled=pos<=0;$('moveUp').disabled=pos<=0;$('moveDown').disabled=pos<0||pos>=siblings.length-1;return true}
+function cycle(id,p){const byId=new Map(rows.map(r=>[nid(r),r]));let seen=new Set();while(p){if(p===id||seen.has(p))return true;seen.add(p);p=par(byId.get(p)||{})}return false}
+function recalcSubtree(id){
+ const byId=new Map(rows.map(r=>[nid(r),r])),children=new Map();
+ rows.forEach(r=>{const p=par(r);if(p&&byId.has(p)){if(!children.has(p))children.set(p,[]);children.get(p).push(r)}});
+ const visited=new Set();
+ function walk(r){if(!r||visited.has(nid(r)))return;visited.add(nid(r));const p=byId.get(par(r)),kind=String(r.node_type||'').toUpperCase();
+  if(['ROOT','TREE','CONTAINER'].includes(kind))r.level='ROOT';
+  else if(!p)r.level='N1';
+  else{const match=String(p.level||'').match(/^N(\d+)$/i);r.level='N'+((match?Number(match[1]):0)+1)}
+  (children.get(nid(r))||[]).forEach(walk)
+ }
+ walk(byId.get(id))
+}
+function siblingList(parent,idToExclude=''){return rows.filter(r=>par(r)===parent&&nid(r)!==idToExclude).sort((a,b)=>(Number(a.order)||999999)-(Number(b.order)||999999)||label(a).localeCompare(label(b)))}
+function renumber(list){list.forEach((r,i)=>r.order=String(i+1))}
+
+function applyNode(){let r=rows.find(x=>nid(x)===selected);if(!r)return false;let p=$('parent').value,t=$('title').value.trim();if(!t){alert('El títol és obligatori.');return false}const rule=structuralRule(selected);if(rule&&(p!==rule.parent||String($('type').value).toUpperCase()!==rule.type||String($('level').value).toUpperCase()!=='ROOT')){alert('No es pot canviar el pare, el tipus ni el nivell estructural de TreeWeb, Tree1 o Tree2.');return false}if(cycle(selected,p)){alert('El pare escollit crearia un cicle.');return false}const oldParent=par(r),oldType=r.node_type,oldOrder=String(r.order||''),requestedOrder=String($('order').value||'');Object.assign(r,{title:t,parent_id:p,level:$('level').value.trim(),order:requestedOrder,node_type:$('type').value.trim(),status:$('status').value.trim(),article_id:$('article_id').value.trim(),article_file:$('article_file').value.trim(),article_status:$('article_status').value.trim(),scope:$('scope').value,notes:$('notes').value});if(oldParent!==p){const newSiblings=siblingList(p,selected);if(requestedOrder!==oldOrder&&Number(requestedOrder)>0){const ix=Math.max(0,Math.min(newSiblings.length,Number(requestedOrder)-1));newSiblings.splice(ix,0,r)}else newSiblings.push(r);renumber(siblingList(oldParent,selected));renumber(newSiblings);recalcSubtree(selected);if(oldParent)expandedNodes.add(oldParent);if(p)expandedNodes.add(p)}else{if(requestedOrder!==oldOrder)renumber(siblingList(p));if(oldType!==r.node_type)recalcSubtree(selected)}formDirty=false;render();select(selected);notice();return true}
+function moveNode(id,targetId,zone='inside'){
+ if(!prepareForSave())return false;const r=rows.find(x=>nid(x)===id),target=rows.find(x=>nid(x)===targetId);if(!r||!target)return false;if(structuralRule(id)){alert('TreeWeb, Tree1 i Tree2 són nodes estructurals protegits. Mou els nodes que hi ha dins.');return false}if(zone!=='inside'&&['WEBTREE-TREE1','WEBTREE-TREE2'].includes(targetId)){alert('Aquestes són arrels de branques. Deixa anar el node al seu interior o utilitza els controls de nivell.');return false}
+ if(cycle(id,targetId)){alert(zone==='inside'?'No es pot moure un node dins de si mateix o d’un dels seus descendents.':'No es pot ordenar un node abans o després d’un dels seus descendents.');return false}
+ const oldParent=par(r),newParent=zone==='inside'?targetId:par(target);
+ if(cycle(id,newParent)){alert('Moviment invàlid: crearia un cicle.');return false}
+ if(zone==='inside'&&oldParent===newParent){alert('Aquest node ja és fill d’aquest node.');return false}
+ const list=siblingList(newParent,id);
+ if(zone==='inside')list.push(r);else{let ix=list.findIndex(x=>nid(x)===targetId);if(ix<0){alert('No s’ha trobat la posició de destinació.');return false}if(zone==='after')ix++;list.splice(ix,0,r)}
+ r.parent_id=newParent;if(oldParent!==newParent)renumber(siblingList(oldParent,id));renumber(list);recalcSubtree(id);if(oldParent)expandedNodes.add(oldParent);if(newParent)expandedNodes.add(newParent);selected=id;formDirty=false;render();select(id);notice();$('draftStatus').textContent=zone==='inside'?'Node convertit en fill a l’esborrany local.':'Node reordenat entre germans a l’esborrany local.';return true
+}
+function moveOutdent(){if(!selected||!prepareForSave())return;if(structuralRule(selected)){alert('TreeWeb, Tree1 i Tree2 són nodes estructurals protegits.');return}const r=rows.find(x=>nid(x)===selected),p=rows.find(x=>nid(x)===par(r));if(!p){alert('Aquest node ja és al nivell arrel.');return}if(structuralRule(nid(p))){alert(nid(p)==='WEBTREE-ROOT'?'Aquest node ja és directament sota TreeWeb.':'Aquest node és al primer nivell de Tree1/Tree2. Per moure’l a TreeWeb, arrossega’l a «Arrel de TreeWeb».');return}const oldParent=par(r),newParent=par(p),list=siblingList(newParent,nid(r));let ix=list.findIndex(x=>nid(x)===nid(p));list.splice(ix<0?list.length:ix+1,0,r);r.parent_id=newParent;renumber(siblingList(oldParent,nid(r)));renumber(list);recalcSubtree(nid(r));if(newParent)expandedNodes.add(newParent);expandedNodes.add(oldParent);const id=nid(r);selected=id;formDirty=false;render();select(id);notice();$('draftStatus').textContent='Node pujat un nivell a l’esborrany local.'}
+function moveIndent(){if(!selected||!prepareForSave())return;if(structuralRule(selected)){alert('TreeWeb, Tree1 i Tree2 són nodes estructurals protegits.');return}const r=rows.find(x=>nid(x)===selected),oldParent=par(r),sib=siblingList(oldParent),ix=sib.findIndex(x=>nid(x)===selected);if(ix<=0){alert('No hi ha cap germà anterior sota el qual puguis posar aquest node.');return}const target=sib[ix-1];if(cycle(selected,nid(target))){alert('Moviment invàlid: crearia un cicle.');return}const childList=siblingList(nid(target),selected);r.parent_id=nid(target);renumber(siblingList(oldParent,selected));childList.push(r);renumber(childList);recalcSubtree(selected);expandedNodes.add(nid(target));if(oldParent)expandedNodes.add(oldParent);const id=selected;formDirty=false;render();select(id);notice();$('draftStatus').textContent='Node baixat un nivell a l’esborrany local.'}
+function moveSibling(delta){if(!selected||!prepareForSave())return;const r=rows.find(x=>nid(x)===selected),p=par(r),sib=siblingList(p),ix=sib.findIndex(x=>nid(x)===selected),to=ix+delta;if(to<0||to>=sib.length){alert('El node ja és al límit d’aquest nivell.');return}[sib[ix],sib[to]]=[sib[to],sib[ix]];renumber(sib);const id=selected;render();select(id);notice();$('draftStatus').textContent='Ordre dels germans actualitzat a l’esborrany local.'}
+function moveToRoot(id){if(!prepareForSave())return;if(structuralRule(id)){alert('TreeWeb, Tree1 i Tree2 són nodes estructurals protegits.');return}const r=rows.find(x=>nid(x)===id);if(!r)return;const oldParent=par(r);const newParent='WEBTREE-ROOT';if(oldParent===newParent){alert('Aquest node ja és directament sota TreeWeb.');return}const roots=siblingList(newParent,id);r.parent_id=newParent;roots.push(r);if(oldParent)renumber(siblingList(oldParent,id));renumber(roots);recalcSubtree(id);if(oldParent)expandedNodes.add(oldParent);expandedNodes.add(newParent);expandedNodes.add(id);const idNow=id;selected=idNow;formDirty=false;render();select(idNow);notice();$('draftStatus').textContent='Node mogut directament sota TreeWeb. Els fills i descendents es conserven.'}
+
+function create(parent){if(!prepareForSave())return;let id='WEB_'+Date.now().toString(36).toUpperCase()+'_'+Math.random().toString(36).slice(2,6).toUpperCase(),r={};headers.forEach(h=>r[h]='');Object.assign(r,{node_id:id,parent_id:parent,title:'Nou node',level:parent==='WEBTREE-ROOT'?'N1':parent?'N2':'N1',order:'',node_type:'NODE',status:'DRAFT',article_status:'DRAFT'});r.order=String(siblingList(parent).reduce((m,x)=>Math.max(m,Number(x.order)||0),0)+1);rows.push(r);renumber(siblingList(parent));recalcSubtree(id);selected=id;formDirty=false;if(parent)expandedNodes.add(parent);render();select(id);$('title').focus();notice()}
+function removeNode(){if(!selected)return;if(structuralRule(selected)){alert('No es poden eliminar TreeWeb, Tree1 ni Tree2 perquè defineixen l’estructura principal. Pots eliminar o moure els seus nodes fills.');return}const hadPending=formDirty||articleDirty;if(hadPending&&!confirm('Hi ha canvis no aplicats al formulari o a l’article. Si continues, es descartaran. Vols continuar?'))return;const byParent=new Map();rows.forEach(r=>{const p=par(r);if(!byParent.has(p))byParent.set(p,[]);byParent.get(p).push(r)});let ids=new Set([selected]),stack=[selected];while(stack.length){const id=stack.pop();(byParent.get(id)||[]).forEach(r=>{if(!ids.has(nid(r))){ids.add(nid(r));stack.push(nid(r))}})}if(!confirm('Eliminar '+ids.size+' node(s), inclosos tots els descendents? Només es modifica l’esborrany. Els fitxers Markdown del repositori no s’esborraran automàticament.'))return;formDirty=false;articleDirty=false;const oldParent=par(rows.find(r=>nid(r)===selected)||{}),paths=new Set(rows.filter(r=>ids.has(nid(r))).map(r=>r.article_file).filter(Boolean));rows=rows.filter(r=>!ids.has(nid(r)));paths.forEach(p=>{if(!rows.some(r=>r.article_file===p))delete articles[p]});ids.forEach(id=>expandedNodes.delete(id));renumber(siblingList(oldParent));selected='';formDirty=false;articleDirty=false;activeArticlePath='';$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('articleBody').value='';render();notice();$('draftStatus').textContent='Nodes eliminats de l’esborrany. Els fitxers Markdown de GitHub es conserven per seguretat.'}
+async function loadArticle(auto=false,expectedNode=''){
+ if(formDirty&&!auto){alert('Aplica primer els canvis del node abans de carregar-ne un altre article.');return}
+ let p=$('article_file').value.trim();if(!p){if(!auto)alert('Introdueix la ruta del fitxer .md i aplica primer el node.');return}
+ if(articleDirty&&p!==activeArticlePath&&!auto&&!confirm('Descartar el text pendent de '+(activeArticlePath||'l’article actual')+' i carregar '+p+'?'))return;
+ const keepSameDraft=articleDirty&&p===activeArticlePath,localApplied=Object.prototype.hasOwnProperty.call(articles,p);
+ if(localApplied&&p!==activeArticlePath&&!auto&&!confirm('Aquest article té un esborrany local. Carregar la versió de GitHub en substituirà el text de l’editor; el contingut ja aplicat a l’esborrany es conservarà. Continuar?'))return;
+ const requestId=++articleLoadSeq,requestNode=selected,bodyAtStart=$('articleBody').value,dirtyAtStart=articleDirty;
+ const f=files.find(x=>x.path===p);
+ try{
+  let md='';if(f){const b=await api('/git/blobs/'+f.sha);md=decode(b.content||'')}
+  if(requestId!==articleLoadSeq||selected!==requestNode||(expectedNode&&selected!==expectedNode))return;
+  const editsMadeWhileLoading=!dirtyAtStart&&articleDirty&&$('articleBody').value!==bodyAtStart;
+  baseArticles[p]=md;
+  if(keepSameDraft||editsMadeWhileLoading){articleDirty=true;$('articleStatus').textContent='Versió de GitHub carregada com a base. El text pendent s’ha conservat; prem «Aplicar article» per fixar-lo.'}
+  else{$('articleBody').value=localApplied?articles[p]:md;articleDirty=false;activeArticlePath=p;$('articleStatus').textContent=f?'Article carregat de GitHub: '+p:'El fitxer no existeix a GitHub; es crearà en publicar.'}
+  notice()
+ }catch(e){if(requestId===articleLoadSeq&&selected===requestNode)$('articleStatus').textContent='No s’ha pogut carregar l’article: '+e.message}
+}
+function applyArticle(){const currentRow=rows.find(x=>nid(x)===selected);let p=articleDirty?(activeArticlePath||(currentRow&&currentRow.article_file===$('article_file').value.trim()?currentRow.article_file:'')):$('article_file').value.trim();if(!p||!/\.md$/i.test(p)||p.startsWith('/')||p.split('/').includes('..')){alert('Indica una ruta Markdown vàlida, sense / inicial ni ..');return false}articles[p]=$('articleBody').value;if(currentRow)currentRow.article_file=p;$('article_file').value=p;articleDirty=false;activeArticlePath=p;render();notice();$('articleStatus').textContent='Article afegit a l’esborrany local: '+p;return true}
+function prepareForSave(){if(articleDirty&&!applyArticle())return false;if(formDirty&&!applyNode())return false;return true}
+
+function diff(){let b=new Map(baseRows.map(r=>[nid(r),r])),a=new Map(rows.map(r=>[nid(r),r]));return {add:[...a.keys()].filter(k=>!b.has(k)),del:[...b.keys()].filter(k=>!a.has(k)),mod:[...a.keys()].filter(k=>b.has(k)&&JSON.stringify(a.get(k))!==JSON.stringify(b.get(k))),art:Object.keys(articles).filter(p=>!Object.prototype.hasOwnProperty.call(baseArticles,p)||articles[p]!==baseArticles[p])}}
+function changedArticles(){return Object.keys(articles).filter(p=>{const f=files.find(x=>x.path===p);return !f||!articles[p].startsWith('\u0000')})}
+function review(){let d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length;if($('summary'))$('summary').textContent=n?n+' canvis pendents':'Sense canvis pendents';if($('details'))$('details').textContent='';}
+function notice(){let d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length;$('draftStatus').className='status '+(n?'warn':'');$('draftStatus').textContent=n?n+' canvis locals pendents. No publicats a GitHub.':'Sense canvis locals pendents.';review()}
+function dbOpen(){return new Promise((res,rej)=>{let q=indexedDB.open(DB,1);q.onupgradeneeded=()=>q.result.createObjectStore(STORE);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function dbSet(v){let db=await dbOpen();return new Promise((res,rej)=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,KEY);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>rej(tx.error)})}
+async function dbGet(){let db=await dbOpen();return new Promise((res,rej)=>{let q=db.transaction(STORE).objectStore(STORE).get(KEY);q.onsuccess=()=>{db.close();res(q.result)};q.onerror=()=>rej(q.error)})}
+async function save(){if(!prepareForSave())return false;await dbSet({version:1,baseCommit,headers,rows,selected,articles,baseArticles});notice();$('draftStatus').textContent='Esborrany desat localment al navegador. '+$('draftStatus').textContent}
+async function restore(ask=true){const d=await dbGet();if(!d)return;if(ask&&!confirm('Recuperar l’esborrany local?'))return;if(d.baseCommit!==baseCommit){$('draftStatus').textContent='L’esborrany correspon a una altra versió de GitHub. No s’ha aplicat automàticament. Desa’l/exporta’l abans de recarregar si el vols conservar.';return}const remoteRows=rows,remoteHeaders=headers,remoteRepairIds=repairedRootIds;try{if(!Array.isArray(d.rows)||!Array.isArray(d.headers))throw Error('format de l’esborrany invàlid');const requiredHeaders=['node_id','parent_id','title','level','order','node_type'];if(!requiredHeaders.every(h=>d.headers.includes(h)))throw Error('falten columnes obligatòries a l’esborrany');if(d.articles!==undefined&&(!d.articles||typeof d.articles!=='object'||Array.isArray(d.articles)))throw Error('mapa d’articles invàlid');if(d.baseArticles!==undefined&&(!d.baseArticles||typeof d.baseArticles!=='object'||Array.isArray(d.baseArticles)))throw Error('mapa d’articles base invàlid');rows=d.rows;headers=d.headers;repairedRootIds=repairOrphanRows();validateStructure();selected=d.selected||'';articles=d.articles||{};baseArticles=d.baseArticles||{};if(selected&&!rows.some(r=>nid(r)===selected))selected='';render();if(selected)select(selected);notice();$('draftStatus').textContent='Esborrany local recuperat i estructura validada. '+$('draftStatus').textContent}catch(e){rows=remoteRows;headers=remoteHeaders;repairedRootIds=remoteRepairIds;selected='';articles={};baseArticles={};formDirty=false;articleDirty=false;$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('articleBody').value='';render();$('draftStatus').className='status err';$('draftStatus').textContent='No s’ha aplicat l’esborrany local perquè l’estructura no és vàlida ('+e.message+'). Les dades remotes s’han mantingut. L’esborrany local continua guardat; prem «Recargar desde GitHub» si vols descartar-lo.'}}
+async function discard(){if(!confirm('Eliminar l’esborrany local? No modifica GitHub.'))return;let db=await dbOpen();await new Promise((res,rej)=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close();rows=baseRows.map(r=>({...r}));articles={};selected='';$('form').classList.add('hidden');$('empty').classList.remove('hidden');$('articleBody').value='';render();notice()}
+function validateStructure(){for(const [id,parent,type] of [['WEBTREE-ROOT','','CONTAINER'],['WEBTREE-TREE1','WEBTREE-ROOT','TREE'],['WEBTREE-TREE2','WEBTREE-ROOT','TREE']]){const r=rows.find(x=>nid(x)===id);if(!r)throw Error('Falta el node estructural obligatori '+id);if(par(r)!==parent||String(r.node_type||'').toUpperCase()!==type||String(r.level||'').toUpperCase()!=='ROOT')throw Error('S’ha alterat l’estructura protegida de '+id+'. No es publicarà.')}let ids=new Set();for(let r of rows){if(!nid(r)||ids.has(nid(r)))throw Error('ID buit o duplicat: '+nid(r));ids.add(nid(r));if(!label(r).trim())throw Error('Node sense títol: '+nid(r));if(nid(r)!=='WEBTREE-ROOT'&&!par(r))throw Error('El node '+label(r)+' ha quedat fora de TreeWeb. Mou-lo sota «TreeWeb · arrel» abans de publicar.')}for(let r of rows){if(par(r)&&!ids.has(par(r)))throw Error('Pare inexistent '+par(r)+' al node '+nid(r));if(cycle(nid(r),par(r)))throw Error('Cicle detectat al node '+nid(r))}}
+function validate(){validateStructure();for(let p of Object.keys(articles))if(!/\.md$/i.test(p)||p.startsWith('/')||p.split('/').includes('..')||!/^(TREEWEB_ARTICLES|01_LIBRARY\/ARTICLES_CURRENT|01_LIBRARY\/ARTICLES_TREEREV1|01_LIBRARY\/ARTICLES_V3|LIBRARY_WEB\/articles)\//i.test(p))throw Error('Ruta Markdown no vàlida o no autoritzada: '+p)}
+
+async function publish(){
+ if(!prepareForSave())return;
+ let d=diff(),paths=d.art;
+ if(!d.add.length&&!d.mod.length&&!d.del.length&&!paths.length){alert('No hi ha canvis per guardar a GitHub.');return}
+ const unbased=paths.filter(p=>files.some(f=>f.path===p)&&!Object.prototype.hasOwnProperty.call(baseArticles,p));
+ if(unbased.length){alert('Abans de publicar, carrega des de GitHub aquests articles per evitar sobreescriure contingut existent sense revisar-lo:\n'+unbased.join('\n'));return}
+ if(!confirm('Guardar els canvis a GitHub, branca TREEWEB01?'))return;
+ let box=$('publishStatus'),publishedSha='';
+ box.className='status';box.classList.remove('hidden');box.textContent='Validant i publicant…';$('publish').disabled=true;
+ try{
+  validate();
+  // Safe rebase: allow unrelated remote commits, but never overwrite a changed CSV/article.
+  let ref=await api('/git/ref/heads/'+BRANCH);
+  if(ref.object.sha!==baseCommit){
+   box.textContent='La branca ha avançat. Comprovant conflictes abans de publicar…';
+   const latestCommit=await api('/git/commits/'+ref.object.sha);
+   const latestTree=await api('/git/trees/'+latestCommit.tree.sha+'?recursive=1');
+   if(latestTree.truncated)throw Error('L’arbre remot és massa gran per validar-lo amb seguretat. No s’ha publicat res.');
+   const latestFiles=latestTree.tree.filter(x=>x.type==='blob');
+   const oldCsv=files.find(f=>f.path===CSV),newCsv=latestFiles.find(f=>f.path===CSV);
+   if(!oldCsv||!newCsv||oldCsv.sha!==newCsv.sha)throw Error('CONFLICTE: TREEWEB.csv ha canviat a GitHub des que has carregat l’editor. No s’ha publicat res. Cal recarregar i revisar l’arbre.');
+   const conflicts=[];
+   for(const p of paths){
+    const oldFile=files.find(f=>f.path===p),newFile=latestFiles.find(f=>f.path===p);
+    if((oldFile?.sha||null)!==(newFile?.sha||null))conflicts.push(p);
+   }
+   if(conflicts.length)throw Error('CONFLICTE: aquests articles han canviat a GitHub des que has carregat l’editor. No s’ha publicat res per evitar sobreescriure’ls:\n'+conflicts.join('\n'));
+   baseCommit=ref.object.sha;baseTree=latestCommit.tree.sha;files=latestFiles;
+  }
+  const entries=[];
+  const b=await api('/git/blobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:makeCSV(),encoding:'utf-8'})});
+  entries.push({path:CSV,mode:'100644',type:'blob',sha:b.sha});
+  for(const p of paths){
+   const x=await api('/git/blobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:articles[p],encoding:'utf-8'})});
+   entries.push({path:p,mode:'100644',type:'blob',sha:x.sha});
+  }
+  const t=await api('/git/trees',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_tree:baseTree,tree:entries})});
+  const c=await api('/git/commits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Edit TREEWEB nodes and articles from draft editor',tree:t.sha,parents:[baseCommit]})});
+  await api('/git/refs/heads/'+BRANCH,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({sha:c.sha,force:false})});
+  publishedSha=c.sha;box.className='status ok';box.textContent='Commit publicat: '+publishedSha+'. Verificant les dades…';
+  await load();
+  await discardDraftAfterPublish();
+  box.className='status ok';box.textContent='Publicat i recarregat correctament. Commit: '+publishedSha;
+ }catch(e){
+  if(publishedSha){box.className='status warn';box.textContent='El commit '+publishedSha+' s’ha publicat, però no s’ha pogut completar la recàrrega de verificació: '+e.message+' L’esborrany local no s’ha eliminat.'}
+  else{box.className='status err';box.textContent='No s’ha publicat res: '+e.message+' L’esborrany local s’ha conservat.'}
+ }finally{$('publish').disabled=false;review()}
+}
+async function reloadFromGithub(){const d=diff(),n=d.add.length+d.mod.length+d.del.length+d.art.length,stored=await dbGet();if(!confirm(n||formDirty||articleDirty||stored?'Recarregar des de GitHub descartarà tots els canvis de pantalla i l’esborrany local guardat. Cancel·la per conservar-los. Continuar?':'Recarregar les dades actuals des de GitHub?'))return;try{await load();await discardDraftAfterPublish();$('publishStatus').className='status ok';$('publishStatus').classList.remove('hidden');$('publishStatus').textContent='Dades recarregades des de GitHub ('+baseCommit.slice(0,7)+').'}catch(e){$('publishStatus').className='status err';$('publishStatus').classList.remove('hidden');$('publishStatus').textContent='No s’ha pogut recarregar: '+e.message+' L’esborrany local no s’ha eliminat.'}}
+async function discardDraftAfterPublish(){let db=await dbOpen();await new Promise(res=>{let tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=res});db.close();articles={};baseArticles={}}
+$('connect').onclick=async()=>{token=$('token').value.trim();if(!token)return;$('loginStatus').classList.remove('hidden');$('loginStatus').textContent='Connectant…';sessionStorage.setItem('tradeverse_editor_token',token);sessionStorage.setItem('tradeverse_treeweb_token',token);try{await load()}catch(e){$('loginStatus').textContent='Error: '+e.message}};
+$('forget').onclick=()=>{token='';sessionStorage.removeItem('tradeverse_editor_token');sessionStorage.removeItem('tradeverse_treeweb_token');$('token').value=''};
+$('rootDrop').addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';$('rootDrop').classList.add('drop-target')});$('rootDrop').addEventListener('dragleave',()=> $('rootDrop').classList.remove('drop-target'));$('rootDrop').addEventListener('drop',e=>{e.preventDefault();$('rootDrop').classList.remove('drop-target');const id=e.dataTransfer.getData('text/plain');if(id)moveToRoot(id)});
+$('search').oninput=render;$('newRoot').onclick=()=>create('WEBTREE-ROOT');$('newChild').onclick=()=>selected?create(selected):alert('Selecciona primer el pare.');$('applyNode').onclick=applyNode;$('deleteNode').onclick=removeNode;$('moveOutdent').onclick=moveOutdent;$('moveIndent').onclick=moveIndent;$('moveUp').onclick=()=>moveSibling(-1);$('moveDown').onclick=()=>moveSibling(1);$('loadArticle').onclick=()=>loadArticle().catch(e=>alert(e.message));$('applyArticle').onclick=applyArticle;$('saveDraft').onclick=()=>save().catch(e=>alert('No s’ha pogut desar: '+e.message));$('restoreDraft')&&($('restoreDraft').onclick=()=>restore(true).catch(e=>alert(e.message)));$('discardDraft')&&($('discardDraft').onclick=()=>discard().catch(e=>alert(e.message)));$('publish').onclick=publish;$('reloadGithub').onclick=reloadFromGithub;
+$('form').querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('input',()=>{if(selected)formDirty=true}));$('form').querySelectorAll('select').forEach(el=>el.addEventListener('change',()=>{if(selected)formDirty=true}));$('articleBody').addEventListener('input',()=>{if(selected)articleDirty=true});
+if(token)load().catch(e=>{$('login').classList.remove('hidden');$('loginStatus').classList.remove('hidden');$('loginStatus').textContent='Connexió automàtica fallida: '+e.message});
+</script></body></html>
