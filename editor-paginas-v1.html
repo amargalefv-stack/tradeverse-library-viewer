@@ -408,6 +408,9 @@ function ensurePreviewConfig(data){
   if(!Array.isArray(data.preview.pages))data.preview.pages=[];
   if(!Array.isArray(data.preview.templates))data.preview.templates=[];
   if(!Array.isArray(data.preview.navigation))data.preview.navigation=[];
+  if(!Array.isArray(data.preview.published_routes)){
+    data.preview.published_routes=[...new Set(data.preview.pages.map(p=>p.path).filter(p=>typeof p==='string'&&p.startsWith('/')))];
+  }
   if(!Array.isArray(data.templates))data.templates=[];
   if(!data.node_templates)data.node_templates={};
 }
@@ -436,28 +439,34 @@ function snapshotLibraryArticle(data,article){
   data.preview.pages.push(page);
 }
 async function preparePageSnapshot(item){
-  if(item.pageFile)return false;
   const current=await getLatestJson(PAGE_FILE,state.pageFile);
-  const data=current.data;
-  ensurePreviewConfig(data);
-  if(item.article){
-    const article=state.libraryData.find(a=>a.web_slug===item.article.web_slug||a.node_id===item.article.node_id);
-    if(!article)throw new Error('No s’ha pogut tornar a llegir l’article de la branca.');
-    snapshotLibraryArticle(data,article);
-  }else{
-    const record=(data.pages||[]).find(p=>p.path===item.path);
-    const libraryIndex=data.library_index&&data.library_index.path===item.path?data.library_index:null;
-    const source=record||libraryIndex||item.previewRecord;
-    if(!source)throw new Error('No hi ha cap definició de pàgina a publicar per a aquesta ruta.');
-    const published=cloneJson(source);
-    const templateId=published.template_id||published.template;
-    ensureTemplatePublished(data,templateId);
-    data.preview.pages=data.preview.pages.filter(p=>p.path!==published.path&&p.id!==published.id);
-    data.preview.pages.push(published);
-  }
   if(current.file.sha!==state.pageFile?.sha)throw new Error('La configuració de pàgines ha canviat. Recarrega abans de publicar.');
+  const data=current.data;
+  const before=JSON.stringify(data,null,2)+'\n';
+  ensurePreviewConfig(data);
+  if(!data.preview.published_routes.includes(item.path))data.preview.published_routes.push(item.path);
+  // Native branch routes only need the explicit Preview allow-list entry.
+  // Data-backed pages and articles also need an immutable snapshot for Next.js static params.
+  if(!item.pageFile){
+    if(item.article){
+      const article=state.libraryData.find(a=>a.web_slug===item.article.web_slug||a.node_id===item.article.node_id);
+      if(!article)throw new Error('No s’ha pogut tornar a llegir l’article de la branca.');
+      snapshotLibraryArticle(data,article);
+    }else{
+      const record=(data.pages||[]).find(p=>p.path===item.path);
+      const libraryIndex=data.library_index&&data.library_index.path===item.path?data.library_index:null;
+      const source=record||libraryIndex||item.previewRecord;
+      if(!source)throw new Error('No hi ha cap definició de pàgina a publicar per a aquesta ruta.');
+      const published=cloneJson(source);
+      const templateId=published.template_id||published.template;
+      ensureTemplatePublished(data,templateId);
+      data.preview.pages=data.preview.pages.filter(p=>p.path!==published.path&&p.id!==published.id);
+      data.preview.pages.push(published);
+    }
+  }
   const content=JSON.stringify(data,null,2)+'\n';
-  await commitBranchChanges([{path:PAGE_FILE,content}],[],'editor-pages: send '+item.path+' to Preview snapshot');
+  if(content===before)return false;
+  await commitBranchChanges([{path:PAGE_FILE,content}],[],'editor-pages: publish route '+item.path+' to Preview allow-list');
   await loadBranch();
   return true;
 }
@@ -490,8 +499,7 @@ async function publishSelected(item){
   const warning='Publicar '+item.path+' a Preview crearà una deployment manual de la branca '+state.branch+'. No publicarà Production. Continuar?';
   if(!confirm(warning))return;
   try{
-    const snapshotNeeded=!item.pageFile&&(!!item.article||!!item.draftRecords.length||!!item.previewRecord);
-    if(snapshotNeeded)await preparePageSnapshot(item);
+    await preparePageSnapshot(item);
     const since=Date.now();
     await dispatchWorkflow(PUBLISH_WORKFLOW,{branch:state.branch,page_path:item.path});
     await waitForWorkflow(PUBLISH_WORKFLOW,since,'Publicació de '+item.path);
@@ -509,12 +517,17 @@ async function removePreview(item){
   if(!confirm('S’eliminaran '+previewList.length+' deployment(s) de Preview associades a '+item.path+'. Aquesta acció no esborra la pàgina de la branca ni modifica Production. Continuar?'))return;
   try{
     // Remove the page snapshot first. The source page and source article remain in the branch.
-    if(item.previewRecord||((state.pageData.preview?.pages||[]).some(p=>p.path===item.path))){
+    const hadSnapshot=!!item.previewRecord||((state.pageData.preview?.pages||[]).some(p=>p.path===item.path));
+    const hadRouteMark=Array.isArray(state.pageData.preview?.published_routes)&&state.pageData.preview.published_routes.includes(item.path);
+    if(hadSnapshot||hadRouteMark){
       const current=await getLatestJson(PAGE_FILE,state.pageFile);
-      if(current.data.preview&&Array.isArray(current.data.preview.pages)){
-        current.data.preview.pages=current.data.preview.pages.filter(p=>p.path!==item.path);
-        if(current.file.sha!==state.pageFile?.sha)throw new Error('La configuració de Preview ha canviat. Recarrega abans de retirar-la.');
-        await commitBranchChanges([{path:PAGE_FILE,content:JSON.stringify(current.data,null,2)+'\n'}],[],'editor-pages: remove '+item.path+' from Preview snapshot');
+      if(current.file.sha!==state.pageFile?.sha)throw new Error('La configuració de Preview ha canviat. Recarrega abans de retirar-la.');
+      ensurePreviewConfig(current.data);
+      current.data.preview.pages=current.data.preview.pages.filter(p=>p.path!==item.path);
+      current.data.preview.published_routes=current.data.preview.published_routes.filter(p=>p!==item.path);
+      const before=JSON.stringify(current.data,null,2)+'\n';
+      if(before!==contentText(current.file)+'\n'){
+        await commitBranchChanges([{path:PAGE_FILE,content:before}],[],'editor-pages: remove '+item.path+' from Preview allow-list');
         await loadBranch();
       }
     }
