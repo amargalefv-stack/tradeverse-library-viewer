@@ -2,7 +2,7 @@
 
 ## URL estable
 - Editor: https://amargalefv-stack.github.io/tradeverse-library-viewer/editor-paginas.html
-- Versió implementada: `editor-paginas-v1.html` (blob SHA `ec11754dd3032b8a913124bc9b6d069b1f99e7da`).
+- Versió implementada: `editor-paginas-v1.html` (blob SHA `a454698f2133b0ef1341026782dd952ea284e814`).
 - Fitxer `editor-pagina.html`: entrada anterior que redirigeix a `editor-pagina-v2.html`; no s'ha modificat durant la creació de l'editor nou. No reutilitzar aquest nom singular.
 
 ## Regles per no perdre l'editor
