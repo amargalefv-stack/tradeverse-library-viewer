@@ -285,13 +285,20 @@ async function loadPreviewDeployments(){
   let deployments;
   try{deployments=await gh('/deployments?environment=preview&per_page=100');}
   catch(e){say('Inventari de pàgines carregat, però no s’han pogut llegir les URLs de Preview: '+e.message,'warn');return;}
-  const relevant=(deployments||[]).filter(d=>String(d.description||'').startsWith('Preview manual · ')).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const prefix='Preview manual · ';
+  const relevant=(deployments||[]).filter(d=>String(d.description||'').startsWith(prefix+' ' )||String(d.description||'').startsWith(prefix)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   const known=new Map(state.items.map(item=>[item.path,item]));
   for(const deployment of relevant){
-    const path=String(deployment.description).slice('Preview manual · '.length);
+    const description=String(deployment.description||'');
+    const marker=' · branch ';
+    const markerAt=description.lastIndexOf(marker);
+    if(markerAt<0)continue; // Legacy/unscoped Preview entries are not attributed to a branch.
+    const path=description.slice(prefix.length,markerAt);
+    const deploymentBranch=description.slice(markerAt+marker.length);
+    if(deploymentBranch!==state.branch)continue;
     const statuses=await gh('/deployments/'+deployment.id+'/statuses?per_page=10').catch(()=>[]);
     const latest=Array.isArray(statuses)?statuses[0]:null;
-    const row={deploymentId:deployment.id,path,createdAt:deployment.created_at,ref:deployment.ref,state:latest?.state||'unknown',baseUrl:latest?.environment_url||null,logUrl:latest?.log_url||null,latestDescription:latest?.description||deployment.description};
+    const row={deploymentId:deployment.id,path,branch:deploymentBranch,createdAt:deployment.created_at,ref:deployment.ref,state:latest?.state||'unknown',baseUrl:latest?.environment_url||null,logUrl:latest?.log_url||null,latestDescription:latest?.description||deployment.description};
     state.deployments.push(row);
     let item=known.get(path);
     if(!item){
@@ -536,7 +543,7 @@ async function deleteSelectedPage(item){
       if(next.length===rows.length)throw new Error('No s’ha trobat l’article a l’índex actual; no s’ha fet cap canvi.');
       updates.push({path:LIBRARY_FILE,content:JSON.stringify(next,null,2)+'\n'});
     }
-    if(item.draftRecords.length||item.previewRecord){
+    if(item.draftRecords.length){
       const current=await getLatestJson(PAGE_FILE,state.pageFile);
       const data=current.data;
       data.pages=(data.pages||[]).filter(p=>p.path!==item.path);
