@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>TradingCriteria · Editor de Pàgines v1</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#173246;background:#f2f5f7;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;font-size:14px;line-height:1.45}
+header{background:#173246;color:#fff;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.brand{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#b9d2de;font-weight:700}
+h1{font-size:25px;margin:4px 0}.subtitle{margin:0;color:#dbe7ec}
+.head-right{font-size:12px;text-align:right}.head-right strong{display:block;font-size:13px}
+main{max-width:1600px;margin:auto;padding:18px}
+.panel{background:#fff;border:1px solid #d7e1e7;border-radius:12px;overflow:hidden;min-width:0}
+.auth{padding:14px 16px;margin-bottom:14px;display:grid;grid-template-columns:minmax(240px,1fr) auto;gap:10px;align-items:end}
+label{display:block;font-weight:700;font-size:12px;margin-bottom:6px}
+input,select,button{font:inherit}input,select{width:100%;padding:10px 12px;border:1px solid #c4d5dd;border-radius:8px;color:#173246;background:white;min-width:0}
+button,.button{border:1px solid #c4d5dd;border-radius:8px;padding:9px 12px;background:#fff;color:#173246;cursor:pointer;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:hover,.button:hover{background:#f1f6f8}button:disabled{opacity:.42;cursor:not-allowed}
+.primary{background:#173246;color:#fff;border-color:#173246}.primary:hover{background:#244c64}.teal{background:#116c70;color:#fff;border-color:#116c70}.danger{border-color:#d77a7a;color:#9d2222;background:#fff}.danger:hover{background:#fff2f2}
+.small{font-size:12px;color:#667e8a}.muted{color:#617b88}.mono{font-family:Consolas,Monaco,monospace;overflow-wrap:anywhere;font-size:12px}
+.auth-help{grid-column:1/-1;margin:0;color:#617b88;font-size:12px}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+#status{padding:10px 12px;background:#e9f1f5;border:1px solid #d4e1e7;border-radius:9px;margin:0 0 14px;white-space:pre-wrap}
+#status.ok{background:#edf8f3;border-color:#b5dcca;color:#155d40}#status.warn{background:#fff8e7;border-color:#e6d297;color:#7b5b0b}#status.error{background:#fff0f0;border-color:#e9b9b9;color:#8e2121}
+.workspace{display:grid;grid-template-columns:minmax(300px,.88fr) minmax(420px,1.5fr);gap:14px;align-items:stretch}
+.panel-head{padding:15px 16px;border-bottom:1px solid #e3ebef;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.panel-head h2{margin:0;font-size:16px}.panel-head p{margin:3px 0 0}
+.list-controls{padding:10px;border-bottom:1px solid #e3ebef}
+.page-list{padding:8px;max-height:calc(100vh - 390px);min-height:300px;overflow:auto}
+.page-item{display:block;width:100%;text-align:left;padding:11px;margin:0 0 5px;border:1px solid transparent;background:#fff;border-radius:9px;font-weight:400}
+.page-item strong{display:block;font-size:13px;margin-bottom:3px}.page-item .path{display:block;color:#587382;font-size:11px;overflow-wrap:anywhere}.page-item .subrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;font-size:11px;color:#647e8a}
+.page-item:hover{background:#f6f9fa}.page-item.active{background:#edf7f8;border-color:#81b4c3}
+.pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;background:#eef2f4;color:#4d6673;white-space:nowrap}
+.pill.live{background:#e4f5eb;color:#176343}.pill.null{background:#f0f2f4;color:#6b7780}.pill.dynamic{background:#fff2d4;color:#865e00}
+.detail{padding:20px}
+.detail h2{font-size:22px;line-height:1.2;margin:0 0 6px}.detail .subtitle2{color:#647b87;margin:0 0 18px}
+.fields{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 14px;margin:18px 0;font-size:13px}
+.fields dt{color:#657d89}.fields dd{margin:0;overflow-wrap:anywhere;min-width:0}
+.url-box{border:1px solid #d9e5ea;border-radius:9px;background:#f7fafb;padding:12px;margin:14px 0}
+.url-box .url-state{font-weight:700;margin-bottom:4px}.url-null{font-family:Consolas,Monaco,monospace;color:#697983}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.note{padding:12px 13px;background:#f2f6f8;border:1px solid #dbe5ea;border-radius:9px;color:#506c79;font-size:12px;line-height:1.55;margin-top:14px}
+.note.warning{background:#fff8e7;border-color:#ecd69e;color:#775a16}
+.bottom{font-size:11px;color:#6b818b;margin:14px 2px 3px;line-height:1.6}
+.empty{padding:22px;color:#69818d}
+.hidden{display:none!important}
+@media(max-width:900px){main{padding:10px}.workspace{grid-template-columns:1fr}.page-list{max-height:40vh;min-height:180px}.auth{grid-template-columns:1fr}.auth-help{grid-column:1}.fields{grid-template-columns:115px 1fr}.head-right{text-align:left}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="brand">TradingCriteria · editor versionat</div>
+    <h1>Editor de Pàgines</h1>
+    <p class="subtitle">Inventari viu de la branca · Preview manual · gestió de pàgines</p>
+  </div>
+  <div class="head-right"><strong>editor-paginas-v1.html</strong>El codi d'aquest editor és independent de la web Vercel.</div>
+</header>
+
+<main>
+  <section class="panel auth" id="auth">
+    <div>
+      <label for="token">Token de GitHub</label>
+      <input id="token" type="password" autocomplete="off" placeholder="Enganxa el teu token de GitHub aquí">
+    </div>
+    <button id="connect" class="primary">Connectar i carregar</button>
+    <p class="auth-help">El token només es conserva en aquesta sessió del navegador i només s'envia a l'API de GitHub. Permisos necessaris al repositori: Contents lectura/escriptura, Actions lectura/escriptura i Deployments lectura/escriptura. El token de Vercel no entra al navegador: només s'utilitza com a secret del workflow.</p>
+  </section>
+
+  <div class="toolbar">
+    <label for="branch" style="margin:0">Branca</label>
+    <select id="branch" style="max-width:300px" disabled><option>Connecta amb GitHub primer</option></select>
+    <button id="reload" disabled>Recarregar de GitHub</button>
+    <button id="disconnect" disabled>Desconnectar</button>
+    <span class="small" id="headInfo"></span>
+  </div>
+
+  <p id="status" role="status" aria-live="polite">Connecta amb GitHub per llegir les pàgines directament de la branca. La llista no està hardcoded.</p>
+
+  <div class="workspace">
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Pàgines detectades a la branca</h2><p class="small" id="count">Encara no s'ha llegit cap branca.</p></div>
+      </div>
+      <div class="list-controls"><input id="search" placeholder="Cercar títol, ruta o fitxer…" disabled></div>
+      <div class="page-list" id="pageList"><div class="empty">Connecta amb GitHub per llegir l'inventari.</div></div>
+    </section>
+
+    <section class="panel">
+      <div class="detail" id="detail"><div class="empty">Selecciona una pàgina de la llista.</div></div>
+    </section>
+  </div>
+
+  <p class="bottom">Regles de seguretat: els commits normals només desen canvis a GitHub; no despleguen Vercel. La Preview només s'executa quan prems explícitament «Publicar a Preview». Production no es publica des d'aquest editor. L'Editor està versionat en un fitxer independent: per evolucionar-lo, crea una nova versió (v2, v3...) i no sobreescriguis aquest fitxer.</p>
+</main>
+
+<script>
+'use strict';
+const OWNER='amargalefv-stack';
+const REPO='tradeverse-project-master';
+const PAGE_FILE='web/data/page-editor.json';
+const LIBRARY_FILE='web/data/library.json';
+const PUBLISH_WORKFLOW='publish-preview-manual.yml';
+const DELETE_WORKFLOW='delete-preview-manual.yml';
+const TOKEN_KEY='tc_pages_editor_token_v1';
+const BRANCH_KEY='tc_pages_editor_branch_v1';
+const $=id=>document.getElementById(id);
+const state={token:'',branch:'PAGEWEB01',branches:[],branchMeta:null,headSha:'',baseTreeSha:'',tree:[],pageFile:null,pageData:null,libraryFile:null,libraryData:[],items:[],selectedPath:'',deployments:[],loading:false};
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function escPath(path){return String(path||'').split('/').map(encodeURIComponent).join('/');}
+function branchPath(branch){return String(branch||'').split('/').map(encodeURIComponent).join('/');}
+function decodeBase64Utf8(text){
+  const binary=atob(String(text||'').replace(/\s/g,''));
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return new TextDecoder('utf-8',{fatal:false}).decode(bytes);
+}
+function encodeBase64Utf8(text){
+  const bytes=new TextEncoder().encode(String(text));
+  let binary='';
+  for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));
+  return btoa(binary);
+}
+function say(message,kind='info'){const el=$('status');el.className=kind==='ok'?'ok':kind==='warn'?'warn':kind==='error'?'error':'';el.textContent=message;}
+function requireToken(){if(!state.token)throw new Error('Connecta primer amb GitHub.');}
+async function gh(path,opts={}){
+  requireToken();
+  const options={method:opts.method||'GET',headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',Authorization:'Bearer '+state.token},cache:'no-store'};
+  if(opts.body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(opts.body);}
+  const response=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+path,options);
+  const text=await response.text();
+  let data=null;
+  if(text){try{data=JSON.parse(text);}catch{data={message:text};}}
+  if(!response.ok)throw new Error((data&&data.message)||('GitHub API ha retornat HTTP '+response.status));
+  return data;
+}
+function slugTitle(path){
+  if(path==='/')return 'Portada principal';
+  if(path==='/[...pagePath]')return 'Ruta dinàmica general';
+  if(path==='/biblioteca/[slug]')return 'Ruta dinàmica d’articles';
+  return path.split('/').filter(Boolean).map(seg=>seg.replace(/^\[/,'').replace(/\]$/,'').replace(/^\.\.\./,'').replace(/[-_]+/g,' ').split(' ').filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')).join(' · ');
+}
+function isValidPreviewBase(url){
+  try{const u=new URL(url);return u.protocol==='https:'&&/^[a-z0-9.-]+\.vercel\.app$/i.test(u.hostname);}catch{return false;}
+}
+function absolutePageUrl(base,path){
+  if(!base||!isValidPreviewBase(base)||!path||path.includes('[')||path.includes(']'))return null;
+  return new URL(path==='/'?'/':path,base.endsWith('/')?base:base+'/').toString();
+}
+function addOrGet(map,path,title){
+  if(!path||typeof path!=='string'||!path.startsWith('/'))return null;
+  if(!map.has(path))map.set(path,{path,title:title||slugTitle(path),pageFile:null,sourceType:'',draftRecords:[],previewRecord:null,article:null,isDynamic:path.includes('[')||path.includes(']'),previewHistory:[],previewDeployment:null,previewUrl:null,previewOnly:false});
+  const item=map.get(path);
+  if(title&&(!item.title||item.title===slugTitle(path)))item.title=title;
+  return item;
+}
+function routeFromFile(path){
+  if(!path.startsWith('web/app/')||!path.endsWith('/page.tsx')&&!path.endsWith('/page.tsx')&&path!=='web/app/page.tsx')return null;
+  if(path==='web/app/page.tsx')return '/';
+  if(path==='web/app/editor-paginas/page.tsx')return null;
+  if(path.endsWith('/page.tsx')){
+    let rel=path.slice('web/app/'.length,-'/page.tsx'.length);
+    if(!rel)return '/';
+    const segments=rel.split('/').filter(seg=>seg&&!seg.startsWith('@')&&!(seg.startsWith('(')&&seg.endsWith(')')));
+    return '/' + segments.join('/');
+  }
+  return null;
+}
+async function connect(){
+  const entered=$('token').value.trim();
+  if(entered)state.token=entered;
+  else state.token=sessionStorage.getItem(TOKEN_KEY)||'';
+  if(!state.token){say('Cal enganxar el token de GitHub.','warn');return;}
+  $('connect').disabled=true;
+  try{
+    const me=await fetch('https://api.github.com/user',{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+state.token,'X-GitHub-Api-Version':'2022-11-28'},cache:'no-store'});
+    const who=await me.json();
+    if(!me.ok)throw new Error(who.message||'No s’ha pogut autenticar el token.');
+    sessionStorage.setItem(TOKEN_KEY,state.token);
+    $('token').value='';
+    say('Connectat a GitHub com '+(who.login||'usuari autenticat')+'. Llegint les branques…','ok');
+    await loadBranches();
+    $('branch').disabled=false;$('reload').disabled=false;$('disconnect').disabled=false;$('search').disabled=false;
+    $('auth').classList.add('connected');
+    await loadBranch();
+  }catch(e){say('No s’ha pogut connectar: '+e.message,'error');}
+  finally{$('connect').disabled=false;}
+}
+async function loadBranches(){
+  let branches=[];
+  for(let page=1;page<=10;page++){
+    const chunk=await gh('/branches?per_page=100&page='+page);
+    branches=branches.concat(chunk||[]);
+    if(!chunk||chunk.length<100)break;
+  }
+  state.branches=branches.map(x=>x.name).filter(Boolean).sort((a,b)=>a.localeCompare(b));
+  const stored=sessionStorage.getItem(BRANCH_KEY);
+  state.branch=state.branches.includes(stored)?stored:(state.branches.includes('PAGEWEB01')?'PAGEWEB01':(state.branches.find(b=>b!=='main')||'main'));
+  $('branch').innerHTML=state.branches.map(b=>'<option value="'+escapeHtml(b)+'"'+(b===state.branch?' selected':'')+'>'+escapeHtml(b)+(b==='main'?' · protegida':'')+'</option>').join('');
+}
+async function getFile(path){
+  try{return await gh('/contents/'+escPath(path)+'?ref='+encodeURIComponent(state.branch));}
+  catch(e){if(String(e.message).includes('Not Found')||String(e.message).includes('404'))return null;throw e;}
+}
+function contentText(file){
+  if(!file||typeof file.content!=='string')return '';
+  return decodeBase64Utf8(file.content);
+}
+async function loadBranch(){
+  if(state.loading)return;
+  state.loading=true;
+  $('reload').disabled=true;
+  try{
+    state.branch=$('branch').value||state.branch;
+    if(state.branch==='main')say('La branca main és de consulta. Tria una branca de treball per publicar o esborrar pàgines.','warn');
+    sessionStorage.setItem(BRANCH_KEY,state.branch);
+    const branchMeta=await gh('/branches/'+encodeURIComponent(state.branch));
+    state.branchMeta=branchMeta;state.headSha=branchMeta.commit.sha;state.baseTreeSha=branchMeta.commit.commit.tree.sha;
+    const treeResponse=await gh('/git/trees/'+encodeURIComponent(state.baseTreeSha)+'?recursive=1');
+    if(treeResponse.truncated)throw new Error('GitHub ha retornat un arbre truncat. No es faran operacions d’escriptura.');
+    state.tree=treeResponse.tree||[];
+    const [pageFile,libraryFile]=await Promise.all([getFile(PAGE_FILE),getFile(LIBRARY_FILE)]);
+    state.pageFile=pageFile;state.libraryFile=libraryFile;
+    state.pageData=pageFile?JSON.parse(contentText(pageFile)):{schema:1,pages:[],navigation:[],preview:{pages:[],templates:[],navigation:[]},templates:[]};
+    state.libraryData=libraryFile?JSON.parse(contentText(libraryFile)):[];
+    if(!Array.isArray(state.libraryData))state.libraryData=[];
+    state.items=buildInventory();
+    $('headInfo').textContent='HEAD '+state.headSha.slice(0,10);
+    await loadPreviewDeployments();
+    renderList();
+    if(!state.selectedPath||!state.items.some(x=>x.path===state.selectedPath))state.selectedPath=state.items[0]?.path||'';
+    renderList();
+    renderDetail();
+    const srcCount=state.tree.filter(x=>x.type==='blob'&&x.path.startsWith('web/app/')&&x.path.endsWith('/page.tsx')).length;
+    say('Inventari actualitzat des de '+state.branch+': '+state.items.length+' pàgines/rutes detectades; '+srcCount+' fitxers de pàgina a la branca. Les URLs són null quan no hi ha una Preview manual verificada.','ok');
+  }catch(e){say('Error llegint la branca: '+e.message+' No s’ha escrit cap canvi.','error');}
+  finally{state.loading=false;$('reload').disabled=false;}
+}
+function buildInventory(){
+  const map=new Map();
+  for(const file of state.tree){
+    if(file.type!=='blob'||!file.path.startsWith('web/app/')||!file.path.endsWith('/page.tsx')&&file.path!=='web/app/page.tsx')continue;
+    const path=routeFromFile(file.path);
+    if(!path)continue;
+    const item=addOrGet(map,path,slugTitle(path));
+    item.pageFile=file.path;item.pageFileSha=file.sha;item.sourceType='route';
+  }
+  for(const article of state.libraryData){
+    const slug=article.web_slug||article.slug;
+    if(!slug||typeof slug!=='string')continue;
+    const path='/biblioteca/'+slug;
+    const item=addOrGet(map,path,article.web_title||article.title||slugTitle(path));
+    item.article=article;
+    if(!item.pageFile)item.sourceType='article';
+  }
+  const d=state.pageData||{};
+  for(const page of (Array.isArray(d.pages)?d.pages:[])){
+    const item=addOrGet(map,page.path,page.title);
+    if(item&&!item.draftRecords.some(x=>x.kind==='page'&&x.record.id===page.id))item.draftRecords.push({kind:'page',record:page});
+  }
+  if(d.library_index&&d.library_index.path){
+    const item=addOrGet(map,d.library_index.path,d.library_index.title);
+    if(item)item.draftRecords.push({kind:'library_index',record:d.library_index});
+  }
+  for(const p of ((d.preview&&Array.isArray(d.preview.pages))?d.preview.pages:[])){
+    const item=addOrGet(map,p.path,p.title);
+    if(item)item.previewRecord=p;
+  }
+  for(const item of map.values()){
+    if(!item.sourceType)item.sourceType=item.article?'article':item.previewRecord?'preview':'draft';
+    item.dynamic=item.isDynamic;
+    item.protected=item.path==='/'||item.path==='/editor-paginas'||item.path==='/editor-paginas-v1';
+    item.canPublish=!item.dynamic&&state.branch!=='main'&&(!!item.pageFile||!!item.article||!!item.draftRecords.length||!!item.previewRecord);
+    item.canDeleteBranch=state.branch!=='main'&&!item.protected&&!item.dynamic&&(!!item.pageFile||!!item.article||!!item.draftRecords.length);
+  }
+  return [...map.values()].sort((a,b)=>a.path==='/'?-1:b.path==='/'?1:a.path.localeCompare(b.path,'ca'));
+}
+async function loadPreviewDeployments(){
+  for(const item of state.items){item.previewHistory=[];item.previewDeployment=null;item.previewUrl=null;}
+  state.deployments=[];
+  let deployments;
+  try{deployments=await gh('/deployments?environment=preview&per_page=100');}
+  catch(e){say('Inventari de pàgines carregat, però no s’han pogut llegir les URLs de Preview: '+e.message,'warn');return;}
+  const relevant=(deployments||[]).filter(d=>String(d.description||'').startsWith('Preview manual · ')).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const known=new Map(state.items.map(item=>[item.path,item]));
+  for(const deployment of relevant){
+    const path=String(deployment.description).slice('Preview manual · '.length);
+    const statuses=await gh('/deployments/'+deployment.id+'/statuses?per_page=10').catch(()=>[]);
+    const latest=Array.isArray(statuses)?statuses[0]:null;
+    const row={deploymentId:deployment.id,path,createdAt:deployment.created_at,ref:deployment.ref,state:latest?.state||'unknown',baseUrl:latest?.environment_url||null,logUrl:latest?.log_url||null,latestDescription:latest?.description||deployment.description};
+    state.deployments.push(row);
+    let item=known.get(path);
+    if(!item){
+      item=addOrGet(known,path,'Preview sense pàgina a la branca');
+      item.previewOnly=true;item.sourceType='preview-only';item.canPublish=false;item.canDeleteBranch=false;item.protected=false;item.dynamic=path.includes('[')||path.includes(']');
+      item.previewHistory=[];
+    }
+    item.previewHistory.push(row);
+    if(!item.pageFile&&!item.article&&!item.draftRecords.length&&!item.previewRecord)item.previewOnly=true;
+  }
+  for(const item of state.items){
+    item.previewHistory.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+    const latest=item.previewHistory[0];
+    if(latest&&latest.state==='success'&&isValidPreviewBase(latest.baseUrl)){
+      item.previewDeployment=latest;item.previewUrl=absolutePageUrl(latest.baseUrl,item.path);
+    }else{item.previewDeployment=null;item.previewUrl=null;}
+  }
+  // Include Preview records whose branch page was deleted; these are managed separately.
+  state.items=[...known.values()].sort((a,b)=>a.path==='/'?-1:b.path==='/'?1:a.path.localeCompare(b.path,'ca'));
+}
+function renderList(){
+  const q=$('search').value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const items=state.items.filter(x=>(x.title+' '+x.path+' '+(x.pageFile||'')+' '+x.sourceType).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(q));
+  $('count').textContent=items.length+' de '+state.items.length+' pàgines/rutes · '+items.filter(x=>x.previewUrl).length+' amb URL Preview';
+  if(!items.length){$('pageList').innerHTML='<div class="empty">No hi ha coincidències.</div>';return;}
+  $('pageList').innerHTML=items.map(item=>{
+    const selected=item.path===state.selectedPath?' active':'';
+    const url=item.previewUrl?'<span class="pill live">Preview creada</span>':'<span class="pill null">URL: null</span>';
+    const kind=item.dynamic?'<span class="pill dynamic">Dinàmica</span>':url;
+    return '<button type="button" class="page-item'+selected+'" data-path="'+escapeHtml(item.path)+'"><strong>'+escapeHtml(item.title||slugTitle(item.path))+'</strong><span class="path">'+escapeHtml(item.path)+'</span><span class="path">'+escapeHtml(item.pageFile||item.sourceType||'')+'</span><span class="subrow">'+kind+'<span>'+escapeHtml(item.previewHistory?.length||0)+' Preview</span></span></button>';
+  }).join('');
+  document.querySelectorAll('.page-item').forEach(button=>button.addEventListener('click',()=>{state.selectedPath=button.dataset.path;renderList();renderDetail();}));
+}
+function sourceDescription(item){
+  const sources=[];
+  if(item.pageFile)sources.push('Ruta de codi: '+item.pageFile);
+  if(item.article)sources.push('Article del catàleg web: '+LIBRARY_FILE+' · node '+(item.article.node_id||'sense ID'));
+  for(const ref of item.draftRecords||[])sources.push((ref.kind==='library_index'?'Índex de biblioteca':'Borrador de pàgina')+': '+PAGE_FILE+' · '+(ref.record.id||ref.kind));
+  if(item.previewRecord)sources.push('Snapshot actual de Preview: '+PAGE_FILE);
+  if(item.previewOnly)sources.push('Hi ha una Preview registrada però la ruta ja no és a l’inventari de la branca.');
+  return sources.length?sources.join('\n'):'No s’ha identificat una font editable per aquesta entrada.';
+}
+function renderDetail(){
+  const item=state.items.find(x=>x.path===state.selectedPath);
+  if(!item){$('detail').innerHTML='<div class="empty">Selecciona una pàgina de la llista.</div>';return;}
+  const currentUrl=item.previewUrl?'<a href="'+escapeHtml(item.previewUrl)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(item.previewUrl)+'</a>':'<span class="url-null">null</span>';
+  const lastPreview=item.previewDeployment?new Date(item.previewDeployment.createdAt).toLocaleString():'No hi ha cap Preview manual activa registrada per aquesta ruta.';
+  const dynamicWarning=item.dynamic?'<div class="note warning">Aquesta és una plantilla de ruta dinàmica, no una pàgina concreta. No es pot crear una URL real per al marcador [slug] o [...pagePath]. Selecciona una pàgina concreta de la biblioteca.</div>':'';
+  const rootWarning=item.path==='/'?'<div class="note warning">La portada principal està protegida contra l’esborrat des d’aquest editor.</div>':'';
+  const branchDeleteDisabled=!item.canDeleteBranch||item.dynamic||state.branch==='main';
+  const publishDisabled=!item.canPublish||item.dynamic||state.branch==='main';
+  const previewDeployments=(item.previewHistory||[]).filter(x=>x.state==='success'&&isValidPreviewBase(x.baseUrl));
+  const delPreviewDisabled=previewDeployments.length===0||state.branch==='main'||item.dynamic;
+  const sourceLink=item.pageFile?'https://github.com/'+OWNER+'/'+REPO+'/blob/'+encodeURIComponent(state.branch).replace(/%2F/g,'/')+'/'+item.pageFile:'https://github.com/'+OWNER+'/'+REPO+'/tree/'+encodeURIComponent(state.branch).replace(/%2F/g,'/')+'/web';
+  const actions=[
+    '<button id="publishPage" class="primary teal" '+(publishDisabled?'disabled':'')+'>Publicar pàgina a Preview Vercel</button>',
+    '<button id="removePreview" class="danger" '+(delPreviewDisabled?'disabled':'')+'>Esborrar pàgina de Preview Vercel'+(previewDeployments.length>1?' ('+previewDeployments.length+')':'')+'</button>',
+    '<button id="deletePage" class="danger" '+(branchDeleteDisabled?'disabled':'')+'>Esborrar pàgina de la branca</button>',
+    '<a class="button" href="'+escapeHtml(sourceLink)+'" target="_blank" rel="noopener noreferrer">Veure font a GitHub ↗</a>',
+    item.previewUrl?'<a class="button" href="'+escapeHtml(item.previewUrl)+'" target="_blank" rel="noopener noreferrer">Obrir pàgina Preview ↗</a>':''
+  ].join('');
+  $('detail').innerHTML=
+    '<h2>'+escapeHtml(item.title||slugTitle(item.path))+'</h2>'+
+    '<p class="subtitle2">'+escapeHtml(item.path)+(item.dynamic?' · ruta dinàmica':'')+(item.previewOnly?' · sense font actual a la branca':'')+'</p>'+
+    '<dl class="fields">'+
+      '<dt>Ruta de la pàgina</dt><dd class="mono">'+escapeHtml(item.path)+'</dd>'+
+      '<dt>Font a la branca</dt><dd class="mono">'+escapeHtml(item.pageFile||sourceDescription(item))+'</dd>'+
+      '<dt>URL Vercel Preview</dt><dd>'+currentUrl+'</dd>'+
+      '<dt>Última Preview</dt><dd>'+escapeHtml(lastPreview)+'</dd>'+
+      '<dt>Branca / commit</dt><dd>'+escapeHtml(state.branch)+' · <span class="mono">'+escapeHtml(state.headSha.slice(0,12))+'</span></dd>'+
+    '</dl>'+
+    '<div class="actions">'+actions+'</div>'+
+    dynamicWarning+rootWarning+
+    '<div class="note"><strong>Publicar a Preview</strong> crea manualment una deployment Vercel a partir de la branca escollida i registra la URL d’aquesta ruta a GitHub. La deployment conté el web de la branca, no una aplicació diferent per pàgina. <strong>Esborrar de Preview</strong> elimina les deployments de Preview registrades per a aquesta ruta i retira el seu snapshot de la configuració de Preview; no esborra el codi de la branca. <strong>Esborrar pàgina</strong> modifica només la branca seleccionada; la URL Preview continua existint fins que s’elimini expressament.</div>'+
+    '<div class="note warning">Protecció: no es pot esborrar la portada ni les rutes dinàmiques de sistema. Les pàgines d’articles s’esborren de l’índex web, però els fitxers font originals de la biblioteca es conserven.</div>';
+  const publish=$('publishPage');if(publish)publish.onclick=()=>publishSelected(item);
+  const remove=$('removePreview');if(remove)remove.onclick=()=>removePreview(item);
+  const del=$('deletePage');if(del)del.onclick=()=>deleteSelectedPage(item);
+}
+async function getLatestJson(path,fileState){
+  const file=await getFile(path);
+  if(!file)throw new Error('No s’ha trobat el fitxer '+path+' a '+state.branch+'.');
+  const text=contentText(file);
+  return {file,data:JSON.parse(text)};
+}
+async function commitBranchChanges(updates,deletes,message){
+  if(state.branch==='main')throw new Error('Les operacions d’escriptura estan bloquejades a main.');
+  const latest=await gh('/branches/'+encodeURIComponent(state.branch));
+  if(latest.commit.sha!==state.headSha)throw new Error('La branca ha avançat des de l’última lectura. He aturat l’escriptura per no sobreescriure canvis. Recarrega i torna-ho a provar.');
+  const baseTree=latest.commit.commit.tree.sha;
+  const entries=[];
+  for(const update of updates){
+    const blob=await gh('/git/blobs',{method:'POST',body:{content:update.content,encoding:'utf-8'}});
+    entries.push({path:update.path,mode:'100644',type:'blob',sha:blob.sha});
+  }
+  for(const path of deletes)entries.push({path,mode:'100644',type:'blob',sha:null});
+  if(!entries.length)throw new Error('No hi ha canvis per guardar.');
+  const tree=await gh('/git/trees',{method:'POST',body:{base_tree:baseTree,tree:entries}});
+  const commit=await gh('/git/commits',{method:'POST',body:{message,tree:tree.sha,parents:[latest.commit.sha]}});
+  const ref='refs/heads/'+String(state.branch).split('/').map(encodeURIComponent).join('/');
+  await gh('/git/'+ref,{method:'PATCH',body:{sha:commit.sha,force:false}});
+  return commit.sha;
+}
+function cloneJson(value){return JSON.parse(JSON.stringify(value));}
+function ensurePreviewConfig(data){
+  if(!data.preview)data.preview={pages:[],templates:[],navigation:[]};
+  if(!Array.isArray(data.preview.pages))data.preview.pages=[];
+  if(!Array.isArray(data.preview.templates))data.preview.templates=[];
+  if(!Array.isArray(data.preview.navigation))data.preview.navigation=[];
+  if(!Array.isArray(data.templates))data.templates=[];
+  if(!data.node_templates)data.node_templates={};
+}
+function ensureTemplatePublished(data,templateId){
+  if(!templateId)return;
+  const template=(data.templates||[]).find(t=>t.id===templateId);
+  if(!template)throw new Error('No s’ha trobat la plantilla '+templateId+'. No s’ha publicat res.');
+  data.preview.templates=data.preview.templates.filter(t=>t.id!==templateId);
+  data.preview.templates.push(cloneJson(template));
+}
+function snapshotLibraryArticle(data,article){
+  const hasChildren=Array.isArray(article.children)&&article.children.length>0;
+  const templateId=(data.node_templates&&data.node_templates[article.node_id])||(hasChildren?'article-children':'article');
+  ensureTemplatePublished(data,templateId);
+  const template=data.templates.find(t=>t.id===templateId);
+  const page={
+    id:'node-'+article.node_id,kind:'library',title:article.web_title||article.title,
+    path:'/biblioteca/'+(article.web_slug||article.slug),node_id:article.node_id,
+    template:templateId,template_id:templateId,background:template.background||'#ffffff',
+    color:template.color||'#173246',accent:template.accent||'#116c70',
+    width:template.width||1100,gap:template.gap||24,columns:template.columns||4,
+    blocks:cloneJson(template.blocks||[]),markdown:article.markdown||'',
+    children:(article.children||[]).map(c=>({title:c.title,node_id:c.node_id}))
+  };
+  data.preview.pages=data.preview.pages.filter(p=>p.path!==page.path&&p.node_id!==page.node_id);
+  data.preview.pages.push(page);
+}
+async function preparePageSnapshot(item){
+  if(item.pageFile)return false;
+  const current=await getLatestJson(PAGE_FILE,state.pageFile);
+  const data=current.data;
+  ensurePreviewConfig(data);
+  if(item.article){
+    const article=state.libraryData.find(a=>a.web_slug===item.article.web_slug||a.node_id===item.article.node_id);
+    if(!article)throw new Error('No s’ha pogut tornar a llegir l’article de la branca.');
+    snapshotLibraryArticle(data,article);
+  }else{
+    const record=(data.pages||[]).find(p=>p.path===item.path);
+    const libraryIndex=data.library_index&&data.library_index.path===item.path?data.library_index:null;
+    const source=record||libraryIndex||item.previewRecord;
+    if(!source)throw new Error('No hi ha cap definició de pàgina a publicar per a aquesta ruta.');
+    const published=cloneJson(source);
+    const templateId=published.template_id||published.template;
+    ensureTemplatePublished(data,templateId);
+    data.preview.pages=data.preview.pages.filter(p=>p.path!==published.path&&p.id!==published.id);
+    data.preview.pages.push(published);
+  }
+  if(current.file.sha!==state.pageFile?.sha)throw new Error('La configuració de pàgines ha canviat. Recarrega abans de publicar.');
+  const content=JSON.stringify(data,null,2)+'\n';
+  await commitBranchChanges([{path:PAGE_FILE,content}],[],'editor-pages: send '+item.path+' to Preview snapshot');
+  await loadBranch();
+  return true;
+}
+async function dispatchWorkflow(workflow,inputs){
+  return gh('/actions/workflows/'+encodeURIComponent(workflow)+'/dispatches',{method:'POST',body:{ref:state.branch,inputs}});
+}
+async function latestWorkflowRun(workflow,startedAt){
+  const q='?branch='+encodeURIComponent(state.branch)+'&event=workflow_dispatch&per_page=10';
+  const r=await gh('/actions/workflows/'+encodeURIComponent(workflow)+'/runs'+q);
+  return (r.workflow_runs||[]).find(run=>new Date(run.created_at).getTime()>=startedAt-10000)||null;
+}
+async function waitForWorkflow(workflow,startedAt,description){
+  say(description+' · esperant que GitHub Actions iniciï el workflow…','warn');
+  let run=null;
+  for(let n=0;n<30&&!run;n++){await sleep(3000);run=await latestWorkflowRun(workflow,startedAt).catch(()=>null);}
+  if(!run)throw new Error('El workflow s’ha sol·licitat però no ha aparegut als runs. Obre GitHub Actions i comprova permisos del token.');
+  for(let n=0;n<90;n++){
+    const r=await gh('/actions/runs/'+run.id);
+    if(r.status==='completed'){
+      if(r.conclusion!=='success')throw new Error('El workflow ha acabat amb resultat '+r.conclusion+'. Obre el run de GitHub Actions per veure els logs.');
+      return r;
+    }
+    say(description+' · workflow '+r.status+' ('+(n+1)+'/90)…','warn');
+    await sleep(4000);
+  }
+  throw new Error('El workflow continua en execució. Recarrega més tard per consultar la URL o l’estat.');
+}
+async function publishSelected(item){
+  if(!item.canPublish||item.dynamic||state.branch==='main')return;
+  const warning='Publicar '+item.path+' a Preview crearà una deployment manual de la branca '+state.branch+'. No publicarà Production. Continuar?';
+  if(!confirm(warning))return;
+  try{
+    const snapshotNeeded=!item.pageFile&&(!!item.article||!!item.draftRecords.length||!!item.previewRecord);
+    if(snapshotNeeded)await preparePageSnapshot(item);
+    const since=Date.now();
+    await dispatchWorkflow(PUBLISH_WORKFLOW,{branch:state.branch,page_path:item.path});
+    await waitForWorkflow(PUBLISH_WORKFLOW,since,'Publicació de '+item.path);
+    await loadBranch();
+    const updated=state.items.find(x=>x.path===item.path);
+    if(updated?.previewUrl)say('Preview creada i verificada per a '+item.path+': '+updated.previewUrl,'ok');
+    else say('El workflow ha acabat, però GitHub encara no retorna una URL de Preview verificable per a '+item.path+'. Recarrega o comprova els logs.','warn');
+  }catch(e){say('No s’ha pogut publicar la pàgina: '+e.message,'error');}
+}
+async function removePreview(item){
+  const active=(item.previewHistory||[]).filter(x=>x.state==='success'&&isValidPreviewBase(x.baseUrl));
+  if(!active.length)return;
+  if(state.branch==='main')return;
+  const previewList=active.map(x=>({url:x.baseUrl,githubDeploymentId:String(x.deploymentId)}));
+  if(!confirm('S’eliminaran '+previewList.length+' deployment(s) de Preview associades a '+item.path+'. Aquesta acció no esborra la pàgina de la branca ni modifica Production. Continuar?'))return;
+  try{
+    // Remove the page snapshot first. The source page and source article remain in the branch.
+    if(item.previewRecord||((state.pageData.preview?.pages||[]).some(p=>p.path===item.path))){
+      const current=await getLatestJson(PAGE_FILE,state.pageFile);
+      if(current.data.preview&&Array.isArray(current.data.preview.pages)){
+        current.data.preview.pages=current.data.preview.pages.filter(p=>p.path!==item.path);
+        if(current.file.sha!==state.pageFile?.sha)throw new Error('La configuració de Preview ha canviat. Recarrega abans de retirar-la.');
+        await commitBranchChanges([{path:PAGE_FILE,content:JSON.stringify(current.data,null,2)+'\n'}],[],'editor-pages: remove '+item.path+' from Preview snapshot');
+        await loadBranch();
+      }
+    }
+    const since=Date.now();
+    await dispatchWorkflow(DELETE_WORKFLOW,{branch:state.branch,page_path:item.path,deployments_json:JSON.stringify(previewList)});
+    await waitForWorkflow(DELETE_WORKFLOW,since,'Retirada de Preview per a '+item.path);
+    await loadBranch();
+    const updated=state.items.find(x=>x.path===item.path);
+    if(updated&&!updated.previewUrl)say('Les Preview registrades de '+item.path+' s’han retirat. URL actual: null.','ok');
+    else say('El workflow ha acabat. Recarrega per verificar l’estat final de les URLs.','warn');
+  }catch(e){say('No s’ha pogut retirar la Preview: '+e.message,'error');}
+}
+async function deleteSelectedPage(item){
+  if(!item.canDeleteBranch||item.dynamic||item.protected||state.branch==='main')return;
+  const detail=item.article&&!item.pageFile?'S’eliminarà només l’entrada de '+LIBRARY_FILE+' per a aquest article. El Markdown original i l’arbre canònic es conservaran.':item.pageFile?'S’eliminarà el fitxer de ruta '+item.pageFile+' de la branca '+state.branch+'.':'S’eliminarà la definició de pàgina de '+PAGE_FILE+' a la branca '+state.branch+'.';
+  if(!confirm('ELIMINAR PÀGINA '+item.path+'?\n\n'+detail+'\n\nLa Preview publicada no s’eliminarà automàticament. Hauràs d’utilitzar «Esborrar pàgina de Preview Vercel» separadament. Continuar?'))return;
+  try{
+    const deletes=[];
+    const updates=[];
+    if(item.pageFile)deletes.push(item.pageFile);
+    // Removing an article here removes it from the website index only. Its original source Markdown is preserved.
+    if(item.article){
+      const latest=await getLatestJson(LIBRARY_FILE,state.libraryFile);
+      const rows=Array.isArray(latest.data)?latest.data:[];
+      const next=rows.filter(a=>!(a.web_slug===item.article.web_slug&&a.node_id===item.article.node_id));
+      if(next.length===rows.length)throw new Error('No s’ha trobat l’article a l’índex actual; no s’ha fet cap canvi.');
+      updates.push({path:LIBRARY_FILE,content:JSON.stringify(next,null,2)+'\n'});
+    }
+    if(item.draftRecords.length||item.previewRecord){
+      const current=await getLatestJson(PAGE_FILE,state.pageFile);
+      const data=current.data;
+      data.pages=(data.pages||[]).filter(p=>p.path!==item.path);
+      if(data.library_index&&data.library_index.path===item.path)delete data.library_index;
+      // Keep preview.pages untouched by design: Preview cleanup is a separate button.
+      if(current.file.sha!==state.pageFile?.sha)throw new Error('La configuració de pàgines ha canviat. Recarrega abans d’esborrar.');
+      updates.push({path:PAGE_FILE,content:JSON.stringify(data,null,2)+'\n'});
+    }
+    await commitBranchChanges(updates,deletes,'editor-pages: delete page '+item.path);
+    state.selectedPath='';
+    await loadBranch();
+    say('Pàgina eliminada de la branca '+state.branch+'. Qualsevol Preview existent es conserva fins que la retiris expressament.','ok');
+  }catch(e){say('No s’ha pogut esborrar la pàgina: '+e.message,'error');}
+}
+function disconnect(){
+  state.token='';sessionStorage.removeItem(TOKEN_KEY);
+  $('token').value='';$('branch').disabled=true;$('reload').disabled=true;$('disconnect').disabled=true;$('search').disabled=true;$('connect').disabled=false;
+  $('branch').innerHTML='<option>Connecta amb GitHub primer</option>';state.items=[];state.tree=[];state.selectedPath='';
+  $('pageList').innerHTML='<div class="empty">Desconnectat.</div>';$('detail').innerHTML='<div class="empty">Connecta amb GitHub per continuar.</div>';$('count').textContent='Sense connexió.';$('headInfo').textContent='';
+  say('Token eliminat de la sessió del navegador.','ok');
+}
+$('connect').addEventListener('click',connect);
+$('token').addEventListener('keydown',e=>{if(e.key==='Enter')connect();});
+$('reload').addEventListener('click',loadBranch);
+$('branch').addEventListener('change',async()=>{state.selectedPath='';await loadBranch();});
+$('disconnect').addEventListener('click',disconnect);
+$('search').addEventListener('input',renderList);
+window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem(TOKEN_KEY)){state.token=sessionStorage.getItem(TOKEN_KEY);connect();}});
+</script>
+</body>
+</html>
