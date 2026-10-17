@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Editor de pàgines · PAGEWEB01 · v2</title>
+<html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Editor de pàgines · PAGEWEB01 · v4</title>
 <style>
 :root{color-scheme:light;--ink:#173246;--muted:#607887;--line:#d9e3e8;--bg:#f2f6f8;--accent:#087f8c;--good:#16794b;--warn:#946200}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}header{background:#12303e;color:#fff;padding:18px 22px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}h1{font-size:23px;margin:0}header p{margin:4px 0 0;color:#c6d8df}.wrap{max-width:1500px;margin:auto;padding:20px}.bar,.tabs{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.bar input{flex:1;min-width:220px}input,select,button{font:inherit;border:1px solid #c5d4dc;border-radius:8px;padding:10px 12px;background:#fff;color:var(--ink)}button,a.btn{cursor:pointer;text-decoration:none}button.primary,a.btn.primary{background:var(--accent);color:white;border-color:var(--accent)}button:disabled{opacity:.5;cursor:wait}.pill{font-size:12px;padding:4px 8px;border-radius:99px;background:#e5eef2;color:#375969}.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.7fr);gap:15px}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}.panel h2{font-size:16px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line)}.list{max-height:70vh;overflow:auto}.item{padding:13px 15px;border-bottom:1px solid #eaf0f3}.item:last-child{border:0}.item-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}.item h3{font-size:15px;margin:0 0 3px}.muted{color:var(--muted);font-size:12px;overflow-wrap:anywhere}.actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.actions a,.actions button{font-size:12px;padding:7px 9px}.hidden{display:none!important}.tab.active{background:#12303e;color:white}.status{font-size:12px;font-weight:650}.good{color:var(--good)}.warn{color:var(--warn)}.error{color:#a4262c}.empty{padding:24px;color:var(--muted)}.note{font-size:12px;color:var(--muted);margin:12px 0}.template{padding:13px 15px;border-bottom:1px solid #eaf0f3}.template h3{margin:0 0 5px;font-size:14px}footer{color:var(--muted);font-size:12px;padding:16px 2px}@media(max-width:900px){.grid{grid-template-columns:1fr}.wrap{padding:12px}.list{max-height:none}header{padding:15px}}
 </style></head><body>
@@ -30,11 +30,31 @@ if(!repoResp.ok)throw new Error('No tens accés al repositori '+REPO+' (HTTP '+r
 var treeResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+BRANCH+'?recursive=1',{headers:headers});
 if(!treeResp.ok)throw new Error('No es pot llegir la branca '+BRANCH+' (HTTP '+treeResp.status+').');
 var tree=await treeResp.json();
+var previewByPath={};
+try{
+var depResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments?environment=preview&per_page=100',{headers:headers});
+if(depResp.ok){
+var deployments=await depResp.json();
+for(var di=0;di<deployments.length;di++){
+var dep=deployments[di];
+var desc=String(dep.description||'');
+var match=desc.match(/Preview manual · (.*?) · branch /);
+if(!match)continue;
+var statusResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments/'+dep.id+'/statuses?per_page=1',{headers:headers});
+if(!statusResp.ok)continue;
+var statuses=await statusResp.json();
+if(statuses.length&&statuses[0].state==='success'&&statuses[0].environment_url){
+var candidate=statuses[0].environment_url;
+if(/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(candidate))previewByPath[match[1]]=candidate;
+}
+}
+}
+}catch(previewError){}
 var files=(tree.tree||[]).filter(function(f){return f.type==='blob'&&/^web\/app\/.+\.(tsx|jsx|ts|js)$/.test(f.path)&&(/\/page\.(tsx|jsx|ts|js)$/.test(f.path)||f.path==='web/app/page.tsx')});
 var seen={};var pages=files.map(function(f){var s=f.path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');var route=f.path==='web/app/page.tsx'?'/':'/'+s;if(!s&&route!=='/')return null;if(s.indexOf('(')===0||s.indexOf('api/')===0||s.indexOf('/api/')>=0)return null;return {path:route,source:f.path,title:(s.split('/').pop()||'Portada principal').replace(/[-_]/g,' ')};}).filter(function(p){if(!p||seen[p.path])return false;seen[p.path]=true;return true}).sort(function(a,b){return a.path.localeCompare(b.path)});
 if(!pages.length)throw new Error('Connexió correcta, però no s’han trobat fitxers de pàgina dins web/app a '+BRANCH+'.');
 byId('branch').textContent='Connectat · '+BRANCH+' · '+pages.length+' pàgines';byId('branch').className='pill';
-byId('pageCount').textContent='('+pages.length+')';byId('items').innerHTML=pages.map(function(p){return '<article class="item"><h3>'+p.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</h3><div class="muted">'+p.path+' · '+p.source+'</div><div class="actions"><a class="btn" target="_blank" rel="noreferrer" href="https://github.com/'+OWNER+'/'+REPO+'/blob/'+BRANCH+'/'+p.source+'">Veure codi</a><button class="primary" onclick="window.open(\'https://github.com/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml\',\'_blank\')">Publicar a Preview…</button></div></article>'}).join('');
+byId('pageCount').textContent='('+pages.length+')';byId('items').innerHTML=pages.map(function(p){var preview=previewByPath[p.path];var openButton=preview?'<a class="btn primary" target="_blank" rel="noopener noreferrer" href="'+preview+'">Obrir pàgina publicada</a>':'<span class="muted">Sense URL de Preview registrada per aquesta ruta</span>';return '<article class="item"><h3>'+p.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</h3><div class="muted">'+p.path+' · '+p.source+'</div><div class="actions">'+openButton+'<a class="btn" target="_blank" rel="noreferrer" href="https://github.com/'+OWNER+'/'+REPO+'/blob/'+BRANCH+'/'+p.source+'">Veure codi</a><button class="primary" onclick="window.open(\'https://github.com/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml\',\'_blank\')">Publicar a Preview…</button></div></article>'}).join('');
 byId('updated').textContent='Carregat correctament'; 
 }catch(e){show(String(e.message||e).replace(/</g,'&lt;'),true)}
 finally{btn.disabled=false;btn.textContent='Connectar'}
