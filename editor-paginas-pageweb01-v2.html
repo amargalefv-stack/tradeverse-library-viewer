@@ -22,8 +22,7 @@ async function getJSON(url){if(!token)throw new Error('Introdueix un token GitHu
 async function load(){ $('branch').textContent='Connectant amb GitHub…'; $('branch').className='pill'; $('items').innerHTML='<div class="empty">Llegint PAGEWEB01 a GitHub…</div>';try{
 const [tree,data,deps]=await Promise.all([
 getJSON(API+'/git/trees/'+BRANCH+'?recursive=1'),
-getJSON(API+'/contents/web/data/page-editor.json?ref='+BRANCH).then(async x=>JSON.parse(atob(x.content.replace(/
-/g,'')))).catch(()=>({})),
+getJSON(API+'/contents/web/data/page-editor.json?ref='+BRANCH).then(async x=>JSON.parse(atob(x.content.replace(/\s/g,'')))).catch(()=>({})),
 getJSON(API+'/deployments?environment=preview&per_page=100').catch(()=>[])
 ]);
 deployments=Array.isArray(deps)?deps:[];
