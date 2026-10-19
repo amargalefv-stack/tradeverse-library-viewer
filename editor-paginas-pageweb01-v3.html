@@ -91,14 +91,14 @@ var deployments=await depResp.json();
 for(var di=0;di<deployments.length;di++){
 var dep=deployments[di];
 var desc=String(dep.description||'');
-var match=desc.match(/Preview manual · (.*?) · branch /);
-if(!match)continue;
+var match=desc.match(/Preview manual · (publish|unpublish) · (.*?) · branch /);
+if(!match||match[1]!=='publish')continue;
 var statusResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments/'+dep.id+'/statuses?per_page=1',{headers:headers});
 if(!statusResp.ok)continue;
 var statuses=await statusResp.json();
 if(statuses.length&&statuses[0].state==='success'&&statuses[0].environment_url){
 var candidate=statuses[0].environment_url;
-if(/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(candidate))previewByPath[match[1]]=candidate;
+if(/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(candidate))previewByPath[match[2]]=candidate;
 }
 }
 }
