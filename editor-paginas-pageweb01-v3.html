@@ -14,16 +14,16 @@
 (function(){
 var OWNER='amargalefv-stack', REPO='tradeverse-project-master', BRANCH='PAGEWEB01';
 function byId(id){return document.getElementById(id)}
-window.publishPreview=async function(path,button){
+window.publishPreview=async function(path,button,action){
 var t=byId('token').value.trim();
 if(!t){alert('Primer connecta l’editor amb el token de GitHub.');return}
-if(!confirm('Publicar '+path+' a Vercel Preview des de PAGEWEB01? No es publicarà a Production.'))return;
+action=action||'publish';\nif(!confirm((action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.'))return;
 button.disabled=true;var old=button.textContent;button.textContent='Enviant…';
 try{
-var resp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml/dispatches',{method:'POST',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({ref:BRANCH,inputs:{branch:BRANCH,page_path:path}})});
+var resp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml/dispatches',{method:'POST',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({ref:BRANCH,inputs:{branch:BRANCH,page_path:path,action:action}})});
 if(resp.status!==204){var detail='HTTP '+resp.status;try{var body=await resp.json();detail=body.message||detail}catch(e){}throw new Error(detail+' — comprova que el token tingui Actions: write i Contents: read.')}
 button.textContent='Esperant Vercel…';
-var status=byId('publishStatus');if(status)status.textContent='Publicació de '+path+' en curs. Esperant que GitHub Actions retorni la URL…';
+var status=byId('publishStatus');if(status)status.textContent=(action==='unpublish'?'Retirada de ':'Publicació de ')+path+' en curs. Esperant que GitHub Actions retorni el resultat…';
 var runId=null;
 for(var attempt=0;attempt<36;attempt++){
  await new Promise(function(resolve){setTimeout(resolve,5000)});
@@ -45,7 +45,7 @@ for(var attempt=0;attempt<36;attempt++){
       var ss=await sr.json();
       if(ss.length&&ss[0].state==='success'&&/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(ss[0].environment_url||'')){
         if(status)status.innerHTML='Preview publicada correctament: <a target="_blank" rel="noopener noreferrer" href="'+ss[0].environment_url+'">'+ss[0].environment_url+'</a>';
-        button.textContent='Preview publicada';button.disabled=false;return;
+        button.textContent=action==='unpublish'?'Ruta retirada':'Preview publicada';button.disabled=false;return;
       }
     }
    }
@@ -57,6 +57,17 @@ throw new Error('La publicació continua en curs. Obre GitHub Actions per consul
 }
 function show(msg,err){byId('branch').textContent=err?'Error':'Estat';byId('branch').className=err?'pill error':'pill';byId('items').innerHTML='<div class="empty '+(err?'error':'')+'">'+msg+'</div>'}
 window.onerror=function(message,source,line){try{show('Error JavaScript: '+String(message)+' (línia '+line+').',true)}catch(e){}};
+window.deletePage=async function(path,sha,button){
+var t=byId('token').value.trim();if(!t){alert('Primer connecta GitHub.');return}
+if(!confirm('Eliminar definitivament '+path+' de la branca PAGEWEB01? Es crearà un commit a GitHub.'))return;
+button.disabled=true;var old=button.textContent;button.textContent='Esborrant…';
+try{
+var url='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+path.split('/').map(encodeURIComponent).join('/');
+var resp=await fetch(url,{method:'DELETE',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({message:'Delete page '+path,sha:sha,branch:BRANCH})});
+if(!resp.ok){var detail='HTTP '+resp.status;try{var b=await resp.json();detail=b.message||detail}catch(x){}throw new Error(detail+' — el token necessita Contents: write.')}
+button.textContent='Eliminada';if(byId('publishStatus'))byId('publishStatus').textContent='Pàgina eliminada de PAGEWEB01. Prem Actualitzar per recarregar la llista.';
+}catch(err){alert('No s’ha pogut esborrar: '+err.message);button.disabled=false;button.textContent=old}
+};
 window.connectEditor=async function(){
 var t=byId('token').value.trim();
 if(!t){show('Falta el token. Enganxa un token vigent de GitHub i prem Connectar.',true);return}
@@ -95,7 +106,7 @@ var files=(tree.tree||[]).filter(function(f){return f.type==='blob'&&/^web\/app\
 var seen={};var pages=files.map(function(f){var s=f.path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');var route=f.path==='web/app/page.tsx'?'/':'/'+s;if(!s&&route!=='/')return null;if(s.indexOf('(')===0||s.indexOf('api/')===0||s.indexOf('/api/')>=0)return null;return {path:route,source:f.path,title:(s.split('/').pop()||'Portada principal').replace(/[-_]/g,' ')};}).filter(function(p){if(!p||seen[p.path])return false;seen[p.path]=true;return true}).sort(function(a,b){return a.path.localeCompare(b.path)});
 if(!pages.length)throw new Error('Connexió correcta, però no s’han trobat fitxers de pàgina dins web/app a '+BRANCH+'.');
 byId('branch').textContent='Connectat · '+BRANCH+' · '+pages.length+' pàgines';byId('branch').className='pill';
-byId('pageCount').textContent='('+pages.length+')';byId('items').innerHTML=pages.map(function(p){var preview=previewByPath[p.path];var openButton=preview?'<a class="btn primary" target="_blank" rel="noopener noreferrer" href="'+preview+'">Obrir pàgina publicada</a>':'<span class="muted">Encara no hi ha URL de Preview verificada</span>';return '<article class="item"><h3>'+p.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</h3><div class="muted">'+p.path+' · '+p.source+'</div><div class="actions">'+openButton+'<a class="btn" target="_blank" rel="noreferrer" href="https://github.com/'+OWNER+'/'+REPO+'/blob/'+BRANCH+'/'+p.source+'">Veure codi</a><button class="primary" onclick="window.publishPreview(\''+p.path+'\',this)">Publicar a Preview</button></div></article>'}).join('');
+byId('pageCount').textContent='('+pages.length+')';byId('items').innerHTML=pages.map(function(p){var preview=previewByPath[p.path];var openButton=preview?'<a class="btn primary" target="_blank" rel="noopener noreferrer" href="'+preview+'">Obrir pàgina publicada</a>':'<span class="muted">Encara no hi ha URL de Preview verificada</span>';var routeButton=preview?'<button onclick="window.publishPreview(\''+p.path+'\',this,\'unpublish\')">Retirar de Preview</button>':'<button class="primary" onclick="window.publishPreview(\''+p.path+'\',this,\'publish\')">Publicar a Preview</button>';return '<article class="item"><h3>'+p.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</h3><div class="muted">'+p.path+' · '+p.source+'</div><div class="actions">'+openButton+'<a class="btn" target="_blank" rel="noreferrer" href="https://github.com/'+OWNER+'/'+REPO+'/blob/'+BRANCH+'/'+p.source+'">Veure codi</a>'+routeButton+'<button onclick="window.deletePage(\''+p.source+'\',\''+p.sha+'\',this)">Esborrar pàgina</button></div></article>'}).join('');
 byId('updated').textContent='Carregat correctament'; 
 }catch(e){show(String(e.message||e).replace(/</g,'&lt;'),true)}
 finally{btn.disabled=false;btn.textContent='Connectar'}
