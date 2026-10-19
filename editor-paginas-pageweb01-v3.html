@@ -17,7 +17,8 @@ function byId(id){return document.getElementById(id)}
 window.publishPreview=async function(path,button,action){
 var t=byId('token').value.trim();
 if(!t){alert('Primer connecta l’editor amb el token de GitHub.');return}
-action=action||'publish';\nif(!confirm((action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.'))return;
+action=action||'publish';
+if(!confirm((action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.'))return;
 button.disabled=true;var old=button.textContent;button.textContent='Enviant…';var dispatchStarted=Date.now();
 try{
 var resp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml/dispatches',{method:'POST',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({ref:BRANCH,inputs:{branch:BRANCH,page_path:path,action:action}})});
