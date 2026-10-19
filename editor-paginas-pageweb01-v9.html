@@ -28,57 +28,79 @@ window.publishPreview=async function(path,button,action){
 var t=byId('token').value.trim();
 if(!t){alert('Primer connecta l’editor amb el token de GitHub.');return}
 action=action||'publish';
-var confirmText=action==='publish-all'?'Actualitzar tota la Preview compartida de PAGEWEB01? Totes les rutes ja publicades utilitzaran aquesta nova versió. No es publicarà a Production.':(action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.';if(!confirm(confirmText))return;
-button.disabled=true;var old=button.textContent;button.textContent='Enviant…';var dispatchStarted=Date.now();
+var confirmText=action==='publish-all'?'Actualitzar tota la Preview compartida de PAGEWEB01? Totes les rutes ja publicades utilitzaran aquesta nova versió. No es publicarà a Production.':(action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.';
+if(!confirm(confirmText))return;
+button.disabled=true;var old=button.textContent;button.textContent='Preparant…';
+var status=byId('publishStatus');
+var headers={Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'};
+var registryUrl='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH);
+function signature(entry){return entry?String(entry.workflow_run||'')+'|'+String(entry.updated_at||'')+'|'+String(entry.base_url||''):''}
+async function readRegistry(){
+ var r=await fetch(registryUrl+'&nocache='+Date.now(),{headers:headers,cache:'no-store'});
+ if(!r.ok)throw new Error('No puc llegir el registre de Preview (HTTP '+r.status+'). El token necessita Contents: read.');
+ var file=await r.json();
+ var encoded=String(file.content||'').replaceAll('\n','').replaceAll('\r','').replaceAll(' ','');
+ if(!encoded)throw new Error('El registre de Preview és buit.');
+ var data=JSON.parse(decodeURIComponent(escape(atob(encoded))));
+ if(!data.routes||typeof data.routes!=='object')data.routes={};
+ return data;
+}
 try{
-var resp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/dispatches',{method:'POST',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({event_type:'publish-preview',client_payload:{branch:BRANCH,page_path:path,action:action}})});
-var dispatchedRunId=null;if(resp.status===200){try{var dispatchBody=await resp.json();dispatchedRunId=dispatchBody.workflow_run_id||null}catch(e){}}if(resp.status!==204&&resp.status!==200){var detail='HTTP '+resp.status;try{var body=await resp.json();detail=body.message||detail}catch(e){}var needed=resp.headers.get('X-Accepted-GitHub-Permissions');if(needed)detail+=' · Permís requerit per GitHub: '+needed;if(resp.status===401||resp.status===403){var manualUrl='https://github.com/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml';var statusFallback=byId('publishStatus');if(statusFallback)statusFallback.innerHTML='GitHub ha rebutjat la sol·licitud ('+esc(detail)+'). No s’ha iniciat cap publicació. <a target="_blank" rel="noopener noreferrer" href="'+manualUrl+'">Obrir publicació manual a GitHub Actions</a>. No canviïs permisos fins a revisar aquest missatge.';button.disabled=false;button.textContent=old;return}throw new Error(detail)}
-button.textContent='Esperant Vercel…';
-var status=byId('publishStatus');if(status)status.textContent=(action==='publish-all'?'Actualització de tota la Preview':(action==='unpublish'?'Retirada de ':'Publicació de ')+path)+' en curs. Esperant que GitHub Actions retorni el resultat…';
-var runId=dispatchedRunId;
-for(var attempt=0;attempt<36;attempt++){
- await new Promise(function(resolve){setTimeout(resolve,5000)});
- var runsResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml/runs?per_page=10',{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'}});
- if(!runsResp.ok)throw new Error('Publicació iniciada, però no puc consultar-ne l’estat (HTTP '+runsResp.status+'). El token necessita Actions: read.');
- var runsData=await runsResp.json();
- var run=(runsData.workflow_runs||[]).find(function(r){return (runId&&String(r.id)===String(runId))||(r.event==='repository_dispatch'&&r.created_at&&Date.parse(r.created_at)>=dispatchStarted-15000)});
- if(!run)continue;
- runId=run.id;
- if(run.status==='completed'){
-   if(run.conclusion!=='success')throw new Error('El workflow de Preview ha acabat amb resultat: '+run.conclusion+'. Obre els logs de GitHub Actions per veure el motiu.');
-   var metaResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'}});
-   if(!metaResp.ok)throw new Error('Workflow completat, però no es pot llegir el registre de Preview (HTTP '+metaResp.status+').');
-   var metaFile=await metaResp.json();
-   var metaEncoded=(metaFile.content||'').split(String.fromCharCode(10)).join('').split(String.fromCharCode(13)).join('').split(' ').join('');
-   var metaData=JSON.parse(decodeURIComponent(escape(atob(metaEncoded))));
-   var routeEntry=metaData&&metaData.routes?metaData.routes[path]:null;
+ var before=await readRegistry();
+ var beforeEntry=before.routes[path]||null;
+ var beforeSignature=signature(beforeEntry);
+ var beforeSharedSignature=signature(before.shared_preview||null);
+ var dispatchStarted=Date.now();
+ button.textContent='Enviant…';
+ var resp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/dispatches',{method:'POST',headers:Object.assign({},headers,{'Content-Type':'application/json'}),body:JSON.stringify({event_type:'publish-preview',client_payload:{branch:BRANCH,page_path:path,action:action}})});
+ if(resp.status!==204){
+   var detail='HTTP '+resp.status;
+   try{var body=await resp.json();detail=body.message||detail}catch(e){}
+   var needed=resp.headers.get('X-Accepted-GitHub-Permissions');if(needed)detail+=' · Permís requerit: '+needed;
+   throw new Error('GitHub ha rebutjat la sol·licitud ('+detail+'). No s’ha iniciat cap publicació.');
+ }
+ button.textContent='Esperant Preview…';
+ if(status)status.textContent=(action==='publish-all'?'Actualització de tota la Preview':(action==='unpublish'?'Retirada de ':'Publicació de ')+path)+' en curs. Comprovant el registre de Preview…';
+ for(var attempt=0;attempt<36;attempt++){
+   await new Promise(function(resolve){setTimeout(resolve,5000)});
+   var latest=await readRegistry();
+   var entry=latest.routes[path]||null;
    if(action==='unpublish'){
-     delete previewByPath[path];
-     if(status)status.textContent='Ruta '+path+' retirada del registre de Preview.';
-     renderCurrent();button.disabled=false;button.textContent=old;return;
+     if(!entry&&beforeEntry){
+       delete previewByPath[path];
+       if(status)status.textContent='Ruta '+path+' retirada del registre de Preview.';
+       renderCurrent();button.disabled=false;button.textContent=old;return;
+     }
+     continue;
    }
    if(action==='publish-all'){
-     var sharedBase=metaData&&metaData.shared_preview&&metaData.shared_preview.base_url;
-     if(!sharedBase&&routeEntry)sharedBase=routeEntry.base_url;
-     if(!sharedBase||!/^https:\/\/tradeverse-project-master-git-pageweb01-tradeverse3\.vercel\.app\/?$/.test(sharedBase))throw new Error('Workflow completat, però no hi ha cap àlies compartit vàlid al registre.');
+     var shared=latest.shared_preview||null;
+     if(!shared||signature(shared)===beforeSharedSignature||Date.parse(shared.updated_at||'')<dispatchStarted-5000)continue;
+     var sharedBase=String(shared.base_url||'');
+     if(sharedBase!=='https://tradeverse-project-master-git-pageweb01-tradeverse3.vercel.app'&&!sharedBase.endsWith('://tradeverse-project-master-git-pageweb01-tradeverse3.vercel.app'))throw new Error('El registre no conté l’àlies esperat de Preview compartida.');
      if(sharedBase.endsWith('/'))sharedBase=sharedBase.slice(0,-1);
      previewBaseUrl=sharedBase;
-     Object.keys(metaData.routes||{}).forEach(function(route){previewByPath[route]=sharedBase+(route==='/'?'':route)});
-     if(status)status.innerHTML='Preview completa actualitzada: <a target="_blank" rel="noopener noreferrer" href="'+esc(sharedBase)+'">'+esc(sharedBase)+'</a>. Totes les rutes publicades utilitzen ara la nova versió.';
+     Object.keys(latest.routes||{}).forEach(function(route){previewByPath[route]=sharedBase+(route==='/'?'':route)});
+     if(status)status.innerHTML='Preview completa actualitzada: <a target="_blank" rel="noopener noreferrer" href="'+esc(sharedBase)+'">'+esc(sharedBase)+'</a>. Totes les rutes publicades comparteixen aquesta versió.';
      renderCurrent();button.disabled=false;button.textContent=old;return;
    }
-   if(!routeEntry||!routeEntry.base_url)throw new Error('Workflow completat, però no hi ha cap URL registrada per a '+path+'.');
-   var base=String(routeEntry.base_url);if(base.endsWith('/'))base=base.slice(0,-1);
-   var host=base.slice(8);
-   if(base.indexOf('https://')!==0||host.indexOf('/')>=0||host.indexOf('?')>=0||host.indexOf('#')>=0||host.slice(-11)!=='.vercel.app')throw new Error('El registre conté una URL de Preview no vàlida.');
+   if(!entry||signature(entry)===beforeSignature||Date.parse(entry.updated_at||'')<dispatchStarted-5000)continue;
+   var base=String(entry.base_url||'');
+   if(!base.startsWith('https://')||!base.endsWith('.vercel.app')||base.slice(8).includes('/')||base.includes('?')||base.includes('#'))throw new Error('El registre conté una URL de Preview no vàlida.');
+   if(base.endsWith('/'))base=base.slice(0,-1);
+   previewBaseUrl=latest.shared_preview&&latest.shared_preview.base_url?String(latest.shared_preview.base_url).replace(/\/$/,''):base;
+   Object.keys(latest.routes||{}).forEach(function(route){var routeBase=String((latest.routes[route]||{}).base_url||base);if(routeBase.endsWith('/'))routeBase=routeBase.slice(0,-1);previewByPath[route]=routeBase+(route==='/'?'':route)});
    var publishedUrl=base+(path==='/'?'':path);
    previewByPath[path]=publishedUrl;
    if(status)status.innerHTML='Preview publicada per a '+esc(path)+': <a target="_blank" rel="noopener noreferrer" href="'+esc(publishedUrl)+'">'+esc(publishedUrl)+'</a>';
-   renderCurrent();button.disabled=false;return;
+   renderCurrent();button.disabled=false;button.textContent=old;return;
  }
+ throw new Error('Després de 3 minuts no s’ha registrat cap publicació correcta. Pot haver fallat la compilació; revisa el workflow manual de GitHub Actions. No cal canviar el token.');
+}catch(e){
+ if(status)status.textContent='Error de publicació: '+String(e.message||e);
+ alert('No s’ha pogut confirmar la publicació: '+String(e.message||e));
+ button.disabled=false;button.textContent=old;
 }
-throw new Error('La publicació continua en curs. Obre GitHub Actions per consultar el workflow #'+(runId||'pendent')+'.');
-}catch(e){alert('No s’ha pogut iniciar la publicació: '+e.message);button.disabled=false;button.textContent=old}
 }
 function show(msg,err){byId('branch').textContent=err?'Error':'Estat';byId('branch').className=err?'pill error':'pill';byId('items').innerHTML='<div class="empty '+(err?'error':'')+'">'+msg+'</div>'}
 window.onerror=function(message,source,line){try{show('Error JavaScript: '+String(message)+' (línia '+line+').',true)}catch(e){}};
