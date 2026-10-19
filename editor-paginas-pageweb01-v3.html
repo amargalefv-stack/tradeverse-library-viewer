@@ -92,6 +92,8 @@ var treeResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/tr
 if(!treeResp.ok)throw new Error('No es pot llegir la branca '+BRANCH+' (HTTP '+treeResp.status+').');
 var tree=await treeResp.json();
 previewByPath={};
+// Fallback for the currently verified root Preview. The dynamic list below requires the token to have Deployments: read.
+previewByPath['/']='https://tradeverse-project-master-dcbqvmvwq-tradeverse3.vercel.app';
 try{
 var depResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments?environment=preview&per_page=100',{headers:headers});
 if(depResp.ok){
