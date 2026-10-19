@@ -92,28 +92,24 @@ var treeResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/tr
 if(!treeResp.ok)throw new Error('No es pot llegir la branca '+BRANCH+' (HTTP '+treeResp.status+').');
 var tree=await treeResp.json();
 previewByPath={};previewPermissionMessage='';
-// La lectura de URLs Preview requereix Deployments: read al token.
-
 try{
-var depResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments?environment=preview&per_page=100',{headers:headers});
-if(depResp.ok){
-var deployments=await depResp.json();
-for(var di=0;di<deployments.length;di++){
-var dep=deployments[di];
-var desc=String(dep.description||'');
-var match=desc.match(/Preview manual · (publish|unpublish) · (.*?) · branch /);
-if(!match||Object.prototype.hasOwnProperty.call(previewByPath,match[2]))continue;
-var statusResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments/'+dep.id+'/statuses?per_page=1',{headers:headers});
-if(!statusResp.ok)continue;
-var statuses=await statusResp.json();
-if(statuses.length&&statuses[0].state==='success'){
-if(match[1]==='unpublish'){previewByPath[match[2]]=null;continue;}
-var candidate=statuses[0].environment_url||'';
-if(/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(candidate))previewByPath[match[2]]=candidate;
+var previewResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:headers});
+if(previewResp.ok){
+var previewMeta=await previewResp.json();
+var previewData=JSON.parse(decodeURIComponent(escape(atob((previewMeta.content||'').replace(/\\s/g,'')))));
+var routeMap=previewData&&previewData.routes&&typeof previewData.routes==='object'?previewData.routes:{};
+Object.keys(routeMap).forEach(function(route){
+var entry=routeMap[route]||{},base=String(entry.base_url||'').replace(/\\/$/,'');
+if(!/^https:\/\/[A-Za-z0-9.-]+\\.vercel\\.app$/.test(base))return;
+if(!route.startsWith('/')||route.indexOf('..')>=0)return;
+previewByPath[route]=base+(route==='/'?'':route);
+});
+}else if(previewResp.status!==404){
+var previewDetail='HTTP '+previewResp.status;
+try{var previewBody=await previewResp.json();if(previewBody.message)previewDetail+=' · '+previewBody.message}catch(ignore){}
+previewPermissionMessage='No es pot llegir el registre de Preview ('+previewDetail+'). Cal Contents: read al repositori '+REPO+'.';
 }
-}
-}else{previewPermissionMessage='No es poden llegir les URLs de Preview (HTTP '+depResp.status+'). El token necessita permisos Deployments: read al repositori tradeverse-project-master.';}
-}catch(previewError){previewPermissionMessage='No s’han pogut consultar les URLs de Preview: '+String(previewError.message||previewError)+'. Revisa el permís Deployments: read.';}
+}catch(previewError){previewPermissionMessage='Error llegint el registre de Preview: '+String(previewError.message||previewError);}
 var files=(tree.tree||[]).filter(function(f){return f.type==='blob'&&/^web\/app\/.+\.(tsx|jsx|ts|js)$/.test(f.path)&&(/\/page\.(tsx|jsx|ts|js)$/.test(f.path)||f.path==='web/app/page.tsx')});
 var seen={};var pages=files.map(function(f){var s=f.path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');var route=f.path==='web/app/page.tsx'?'/':'/'+s;if(!s&&route!=='/')return null;if(s.indexOf('(')===0||s.indexOf('api/')===0||s.indexOf('/api/')>=0)return null;return {path:route,source:f.path,sha:f.sha,title:(s.split('/').pop()||'Portada principal').replace(/[-_]/g,' ')};}).filter(function(p){if(!p||seen[p.path])return false;seen[p.path]=true;return true}).sort(function(a,b){return a.path.localeCompare(b.path)});
 if(!pages.length)throw new Error('Connexió correcta, però no s’han trobat fitxers de pàgina dins web/app a '+BRANCH+'.');
