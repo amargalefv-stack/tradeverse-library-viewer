@@ -6,8 +6,8 @@
 <header><div><h1>Editor de pàgines</h1><p>GitHub · branca PAGEWEB01 · allotjat a GitHub Pages</p></div><div class="actions"><input id="token" type="password" autocomplete="off" placeholder="Token GitHub (Contents: read/write; Actions: write + read)" aria-label="Token GitHub" style="max-width:260px"><button id="connect" class="primary">Connectar</button><button id="refresh">Actualitzar</button></div></header>
 <div class="wrap"><div class="bar"><input id="search" type="search" placeholder="Cerca pàgines o plantilles…"><span id="branch" class="pill">Cal connectar GitHub</span><span id="updated" class="muted"></span></div>
 <div class="tabs"><button class="tab active" data-tab="pages">Pàgines <span id="pageCount"></span></button><button class="tab" data-tab="templates">Plantilles <span id="templateCount"></span></button></div>
-<div class="grid"><section class="panel" id="mainPanel"><h2 id="listTitle">Pàgines de PAGEWEB01</h2><div class="item muted" id="publishStatus"></div><div class="list" id="items"><div class="empty">Carregant contingut de la branca…</div></div><div id="templateApply" class="template-help hidden"><strong id="chosenTemplateLabel">Cap plantilla seleccionada</strong><p class="muted">Selecciona una pàgina que ja estigui declarada a la configuració. Només s’aplicaran el disseny i el tipus de plantilla; es conservarà el contingut de la pàgina.</p><div class="template-actions"><select id="templateTarget" aria-label="Pàgina de destí"></select><button id="applyTemplate" class="primary">Aplicar plantilla a la pàgina</button></div><p class="note">Aquesta acció desa el canvi a GitHub (PAGEWEB01); no publica a Vercel. Per veure’l a Preview, després hauràs de publicar manualment la pàgina.</p></div></section>
-<aside><section class="panel"><h2>Publicació a Vercel Preview</h2><div class="item"><p>La publicació és sempre manual. El botó obre el flux de GitHub Actions per publicar la branca a Preview; no es desplega l’editor a Vercel.</p><p class="note">La publicació s’inicia des d’aquest editor amb la ruta seleccionada. Es desplega PAGEWEB01 a Preview, mai a Production.</p><span class="note">Utilitza el botó «Publicar a Preview» de cada pàgina.</span></div></section>
+<div class="grid"><section class="panel" id="mainPanel"><h2 id="listTitle">Pàgines de PAGEWEB01</h2><div class="item muted" id="publishStatus"></div><div class="list" id="items"><div class="empty">Carregant contingut de la branca…</div></div><div id="templateApply" class="template-help hidden"><strong id="chosenTemplateLabel">Cap plantilla seleccionada</strong><p class="muted">Selecciona una pàgina que ja estigui declarada a la configuració. Només s’aplicaran el disseny i el tipus de plantilla; es conservarà el contingut de la pàgina.</p><div class="template-actions"><select id="templateTarget" aria-label="Pàgina de destí"></select><button id="applyTemplate" class="primary">Aplicar plantilla a la pàgina</button></div><p class="note">Aquesta acció desa el canvi a GitHub (PAGEWEB01), però no publica. Després, prem «Actualitzar tota la Preview» per aplicar els canvis de plantilla a totes les rutes publicades.</p></div></section>
+<aside><section class="panel"><h2>Publicació a Vercel Preview</h2><div class="item"><p>La publicació és sempre manual. Els commits a GitHub no despleguen res automàticament.</p><button id="publishAll" class="primary">Actualitzar tota la Preview</button><p class="note">Un sol clic reconstrueix PAGEWEB01 i actualitza la Preview compartida perquè totes les rutes publicades utilitzin la nova versió de la plantilla. Només Preview, mai Production.</p><p class="note">Per afegir una pàgina nova al conjunt publicat, utilitza «Publicar a Preview» a la fila d'aquella pàgina. Les altres rutes publicades també queden actualitzades en aquest mateix deployment.</p></div></section>
 <section class="panel" style="margin-top:15px"><h2>Què mostra aquest editor</h2><div class="item"><ul><li>Pàgines obtingudes de l'arbre real de GitHub, no d'una llista fixa.</li><li>Plantilles declarades a <code>web/data/page-editor.json</code> i registres de pàgines.</li><li>Enllaços a totes les rutes de pàgina sobre el deployment Preview base registrat, i acció per publicar/actualitzar manualment cada pàgina.</li><li>Publicació només mitjançant el workflow manual de GitHub Actions.</li></ul><p class="note">L'esborrat elimina definitivament el fitxer seleccionat de PAGEWEB01 després de confirmar-ho; no es pot desfer des d'aquest editor.</p></div></section></aside></div>
 <footer>Font de dades: GitHub API · amargalefv-stack/tradeverse-project-master · PAGEWEB01. Si la branca és privada o l'API no està disponible, es mostrarà l'error en lloc d'inventar dades.</footer></div>
 <script>
@@ -22,18 +22,19 @@ document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('
 byId('search').addEventListener('input',renderCurrent);
 byId('items').addEventListener('click',function(e){var action=e.target.closest('[data-action]');if(action){e.stopPropagation();if(action.dataset.action==='choose-template'){selectedTemplateId=action.dataset.template;renderCurrent();return}var path=action.getAttribute('data-path');if(action.dataset.action==='publish'||action.dataset.action==='unpublish')window.publishPreview(path,action,action.dataset.action);else if(action.dataset.action==='delete')window.deletePage(path,action.getAttribute('data-sha'),action);return}var row=e.target.closest('[data-select-path]');if(row){selectedPath=row.getAttribute('data-select-path');renderCurrent()}});
 byId('items').addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-select-path]')){e.preventDefault();selectedPath=e.target.getAttribute('data-select-path');renderCurrent()}});
+byId('publishAll').addEventListener('click',function(){window.publishPreview('/',this,'publish-all')});
 
 window.publishPreview=async function(path,button,action){
 var t=byId('token').value.trim();
 if(!t){alert('Primer connecta l’editor amb el token de GitHub.');return}
 action=action||'publish';
-if(!confirm((action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.'))return;
+var confirmText=action==='publish-all'?'Actualitzar tota la Preview compartida de PAGEWEB01? Totes les rutes ja publicades utilitzaran aquesta nova versió. No es publicarà a Production.':(action==='unpublish'?'Retirar ':'Publicar ')+path+(action==='unpublish'?' de':' a')+' Vercel Preview des de PAGEWEB01? No es publicarà a Production.';if(!confirm(confirmText))return;
 button.disabled=true;var old=button.textContent;button.textContent='Enviant…';var dispatchStarted=Date.now();
 try{
 var resp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml/dispatches',{method:'POST',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({ref:BRANCH,inputs:{branch:BRANCH,page_path:path,action:action}})});
 if(resp.status!==204){var detail='HTTP '+resp.status;try{var body=await resp.json();detail=body.message||detail}catch(e){}if(resp.status===401||resp.status===403){var manualUrl='https://github.com/'+OWNER+'/'+REPO+'/actions/workflows/publish-preview-manual.yml';var statusFallback=byId('publishStatus');if(statusFallback)statusFallback.innerHTML='GitHub ha rebutjat el token de l’editor ('+esc(detail)+'). No s’ha iniciat cap publicació. <a target="_blank" rel="noopener noreferrer" href="'+manualUrl+'">Obrir publicació manual a GitHub Actions</a>. Selecciona la branca PAGEWEB01 i introdueix ruta '+esc(path)+' i acció '+esc(action)+'.';button.disabled=false;button.textContent=old;return}throw new Error(detail+' — comprova Actions: write i Contents: read.')}
 button.textContent='Esperant Vercel…';
-var status=byId('publishStatus');if(status)status.textContent=(action==='unpublish'?'Retirada de ':'Publicació de ')+path+' en curs. Esperant que GitHub Actions retorni el resultat…';
+var status=byId('publishStatus');if(status)status.textContent=(action==='publish-all'?'Actualització de tota la Preview':(action==='unpublish'?'Retirada de ':'Publicació de ')+path)+' en curs. Esperant que GitHub Actions retorni el resultat…';
 var runId=null;
 for(var attempt=0;attempt<36;attempt++){
  await new Promise(function(resolve){setTimeout(resolve,5000)});
@@ -54,7 +55,17 @@ for(var attempt=0;attempt<36;attempt++){
    if(action==='unpublish'){
      delete previewByPath[path];
      if(status)status.textContent='Ruta '+path+' retirada del registre de Preview.';
-     renderCurrent();button.disabled=false;return;
+     renderCurrent();button.disabled=false;button.textContent=old;return;
+   }
+   if(action==='publish-all'){
+     var sharedBase=metaData&&metaData.shared_preview&&metaData.shared_preview.base_url;
+     if(!sharedBase&&routeEntry)sharedBase=routeEntry.base_url;
+     if(!sharedBase||!/^https:\/\/tradeverse-project-master-git-pageweb01-tradeverse3\.vercel\.app\/?$/.test(sharedBase))throw new Error('Workflow completat, però no hi ha cap àlies compartit vàlid al registre.');
+     if(sharedBase.endsWith('/'))sharedBase=sharedBase.slice(0,-1);
+     previewBaseUrl=sharedBase;
+     Object.keys(metaData.routes||{}).forEach(function(route){previewByPath[route]=sharedBase+(route==='/'?'':route)});
+     if(status)status.innerHTML='Preview completa actualitzada: <a target="_blank" rel="noopener noreferrer" href="'+esc(sharedBase)+'">'+esc(sharedBase)+'</a>. Totes les rutes publicades utilitzen ara la nova versió.';
+     renderCurrent();button.disabled=false;button.textContent=old;return;
    }
    if(!routeEntry||!routeEntry.base_url)throw new Error('Workflow completat, però no hi ha cap URL registrada per a '+path+'.');
    var base=String(routeEntry.base_url);if(base.endsWith('/'))base=base.slice(0,-1);
