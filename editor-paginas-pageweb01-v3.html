@@ -100,12 +100,13 @@ for(var di=0;di<deployments.length;di++){
 var dep=deployments[di];
 var desc=String(dep.description||'');
 var match=desc.match(/Preview manual · (publish|unpublish) · (.*?) · branch /);
-if(!match||match[1]!=='publish')continue;
+if(!match||Object.prototype.hasOwnProperty.call(previewByPath,match[2]))continue;
 var statusResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments/'+dep.id+'/statuses?per_page=1',{headers:headers});
 if(!statusResp.ok)continue;
 var statuses=await statusResp.json();
-if(statuses.length&&statuses[0].state==='success'&&statuses[0].environment_url){
-var candidate=statuses[0].environment_url;
+if(statuses.length&&statuses[0].state==='success'){
+if(match[1]==='unpublish'){previewByPath[match[2]]=null;continue;}
+var candidate=statuses[0].environment_url||'';
 if(/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(candidate))previewByPath[match[2]]=candidate;
 }
 }
