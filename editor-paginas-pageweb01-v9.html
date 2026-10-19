@@ -96,11 +96,14 @@ try{
 var previewResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:headers});
 if(previewResp.ok){
 var previewMeta=await previewResp.json();
-var previewData=JSON.parse(decodeURIComponent(escape(atob((previewMeta.content||'').replace(/\\s/g,'')))));
+var encoded=(previewMeta.content||'').split(String.fromCharCode(10)).join('').split(String.fromCharCode(13)).join('').split(' ').join('');
+var previewData=JSON.parse(decodeURIComponent(escape(atob(encoded))));
 var routeMap=previewData&&previewData.routes&&typeof previewData.routes==='object'?previewData.routes:{};
 Object.keys(routeMap).forEach(function(route){
-var entry=routeMap[route]||{},base=String(entry.base_url||'').replace(/\\/$/,'');
-if(!/^https:\/\/[A-Za-z0-9.-]+\\.vercel\\.app$/.test(base))return;
+var entry=routeMap[route]||{},base=String(entry.base_url||'');
+if(base.endsWith('/'))base=base.slice(0,-1);
+var host=base.slice(8);
+if(base.indexOf('https://')!==0||host.indexOf('/')>=0||host.indexOf('?')>=0||host.indexOf('#')>=0||host.slice(-11)!=='.vercel.app')return;
 if(!route.startsWith('/')||route.indexOf('..')>=0)return;
 previewByPath[route]=base+(route==='/'?'':route);
 });
