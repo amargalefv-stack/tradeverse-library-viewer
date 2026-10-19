@@ -44,21 +44,25 @@ for(var attempt=0;attempt<36;attempt++){
  runId=run.id;
  if(run.status==='completed'){
    if(run.conclusion!=='success')throw new Error('El workflow de Preview ha acabat amb resultat: '+run.conclusion+'. Obre els logs de GitHub Actions per veure el motiu.');
-   var depResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments?environment=preview&per_page=20',{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'}});
-   if(depResp.ok){
-    var deps=await depResp.json();
-    for(var di=0;di<deps.length;di++){
-      if(deps[di].sha!==run.head_sha)continue;
-      var sr=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/deployments/'+deps[di].id+'/statuses?per_page=1',{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'}});
-      if(!sr.ok)continue;
-      var ss=await sr.json();
-      if(ss.length&&ss[0].state==='success'&&/^https:\/\/[^\s"'<>]+\.vercel\.app\/?$/.test(ss[0].environment_url||'')){
-        if(status)status.innerHTML='Preview publicada correctament: <a target="_blank" rel="noopener noreferrer" href="'+ss[0].environment_url+'">'+ss[0].environment_url+'</a>';
-        button.textContent=action==='unpublish'?'Ruta retirada':'Preview publicada';button.disabled=false;return;
-      }
-    }
+   var metaResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'}});
+   if(!metaResp.ok)throw new Error('Workflow completat, però no es pot llegir el registre de Preview (HTTP '+metaResp.status+').');
+   var metaFile=await metaResp.json();
+   var metaEncoded=(metaFile.content||'').split(String.fromCharCode(10)).join('').split(String.fromCharCode(13)).join('').split(' ').join('');
+   var metaData=JSON.parse(decodeURIComponent(escape(atob(metaEncoded))));
+   var routeEntry=metaData&&metaData.routes?metaData.routes[path]:null;
+   if(action==='unpublish'){
+     delete previewByPath[path];
+     if(status)status.textContent='Ruta '+path+' retirada del registre de Preview.';
+     renderCurrent();button.disabled=false;return;
    }
-   throw new Error('El desplegament ha acabat, però GitHub no ha retornat una URL de Preview verificable.');
+   if(!routeEntry||!routeEntry.base_url)throw new Error('Workflow completat, però no hi ha cap URL registrada per a '+path+'.');
+   var base=String(routeEntry.base_url);if(base.endsWith('/'))base=base.slice(0,-1);
+   var host=base.slice(8);
+   if(base.indexOf('https://')!==0||host.indexOf('/')>=0||host.indexOf('?')>=0||host.indexOf('#')>=0||host.slice(-11)!=='.vercel.app')throw new Error('El registre conté una URL de Preview no vàlida.');
+   var publishedUrl=base+(path==='/'?'':path);
+   previewByPath[path]=publishedUrl;
+   if(status)status.innerHTML='Preview publicada per a '+esc(path)+': <a target="_blank" rel="noopener noreferrer" href="'+esc(publishedUrl)+'">'+esc(publishedUrl)+'</a>';
+   renderCurrent();button.disabled=false;return;
  }
 }
 throw new Error('La publicació continua en curs. Obre GitHub Actions per consultar el workflow #'+(runId||'pendent')+'.');
