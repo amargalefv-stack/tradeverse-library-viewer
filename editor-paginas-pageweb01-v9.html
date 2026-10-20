@@ -189,7 +189,7 @@ try{
 var url='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+path.split('/').map(encodeURIComponent).join('/');
 var resp=await fetch(url+'?ref='+encodeURIComponent(BRANCH),{method:'DELETE',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({message:'Delete page '+path,sha:sha,branch:BRANCH}),cache:'no-store'});
 if(!resp.ok){var detail='HTTP '+resp.status;try{var b=await resp.json();detail=b.message||detail}catch(x){}throw new Error(detail+' — el token necessita Contents: write.')}
-var route=path.replace(/^web\\/app\\//,'').replace(/\\/page\\.(tsx|jsx|ts|js)$/,'').replace(/\\.(tsx|jsx|ts|js)$/,'');
+var route=path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');
 route=route?'/'+route:'/';
 currentPages=currentPages.filter(function(p){return p.source!==path&&p.path!==route});
 delete previewByPath[route];
