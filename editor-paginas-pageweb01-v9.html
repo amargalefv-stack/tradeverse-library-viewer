@@ -173,8 +173,8 @@ async function getCanonicalArticle(node,token){
  var files=await loadCanonicalArticlePaths(token);
  var keys=[articleFileKey(slugFromCanonicalTitle(node.title)),articleFileKey(node.title)].filter(function(x,i,a){return x&&a.indexOf(x)===i});
  var candidates=files.filter(function(f){var base=f.path.split('/').pop().replace(/\.md$/i,'');return keys.indexOf(base)>=0;});
- // Articles editats des de l'editor de nodes es desen a ARTICLES_CURRENT de main. Només s'accepta una còpia de les branques d'arbre si no existeix una versió editorial activa.
- function sourceRank(f){var p=f.path.toUpperCase();if(p.indexOf('01_LIBRARY/ARTICLES_CURRENT/')===0&&f.ref==='main')return 0;if(p.indexOf('01_LIBRARY/ARTICLES_TREEREV1/')===0&&f.ref==='main')return 1;if(p.indexOf('02_LIBRARY_NEW/ARTICLES/')===0&&f.ref===TREE_SOURCE_BRANCH)return 2;return 9;}
+ // La pàgina es regenera des de l'article del node de l'arbre canònic (TRADEVERSE_WORK_2840). ARTICLES_CURRENT de main és només una font alternativa: prioritzar-la podia reutilitzar una versió antiga encara que l'article del node ja hagués canviat.
+ function sourceRank(f){var p=f.path.toUpperCase();if(p.indexOf('02_LIBRARY_NEW/ARTICLES/')===0&&f.ref===TREE_SOURCE_BRANCH)return 0;if(p.indexOf('01_LIBRARY/ARTICLES_CURRENT/')===0&&f.ref==='main')return 1;if(p.indexOf('01_LIBRARY/ARTICLES_TREEREV1/')===0&&f.ref==='main')return 2;return 9;}
  candidates.sort(function(a,b){return sourceRank(a)-sourceRank(b)||a.path.localeCompare(b.path);});
  if(!candidates.length)throw new Error('No he trobat l’article associat al node «'+(node.title||node.node_id)+'» ('+articleId+'). No s’ha creat res.');
  var mismatches=[];
