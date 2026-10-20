@@ -164,21 +164,40 @@ function slugFromCanonicalTitle(value){return String(value||'').normalize('NFD')
 function jsQuote(value){return "'"+String(value==null?'':value).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n')+"'"}
 function articleLead(markdown){var clean=String(markdown||'').replace(/^\uFEFF/,'').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/,'').replace(/^# .+\r?\n/,'');var parts=clean.split(/\r?\n\s*\r?\n/),lead=parts.map(function(x){return x.trim()}).find(function(x){return x&&!/^#{1,6}\s/.test(x)&&!/^[-*+]\s/.test(x)&&!/^>\s/.test(x)});return lead?lead.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/\s+/g,' ').slice(0,300):''}
 async function getCanonicalArticle(node,token){
-  // TREEWEB.csv és la relació canònica node_id -> article_id -> article_file.
-  // El Markdown no porta article_id: no s'ha d'inferir el fitxer pel títol.
+  // Sempre rellegir el node actual de TREEWEB01; no usar el node de la UI com a font.
   var freshRows=await loadCanonicalTree(token);
   var freshNode=freshRows.find(function(r){return r.node_id===node.node_id;});
   if(!freshNode)throw new Error('El node '+node.node_id+' ja no existeix a TREEWEB01. No s’ha creat res.');
   node=freshNode;
   var articleId=String(node.article_id||'').trim();
-  var articlePath=String(node.article_file||'').trim();
   if(!articleId)throw new Error('El node «'+(node.title||node.node_id)+'» no té article_id a TREEWEB.csv. No s’ha creat res.');
-  if(!articlePath||!/\.md$/i.test(articlePath)||articlePath.startsWith('/')||articlePath.split('/').includes('..'))throw new Error('L’article '+articleId+' del node «'+(node.title||node.node_id)+'» no té una ruta article_file vàlida a TREEWEB.csv. No s’ha creat res.');
+  var articlePath=String(node.article_file||'').trim();
+  // TREEWEB v7 resol les rutes absents a partir de l’índex real de fitxers TREEWEB_ARTICLES.
+  // Reproduïm aquesta resolució determinista; no es busquen articles en branques històriques.
+  if(!articlePath){
+    var headers={Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'};
+    var treeResponse=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+encodeURIComponent(TREE_SOURCE_BRANCH)+'?recursive=1',{headers:headers,cache:'no-store'});
+    if(!treeResponse.ok)throw new Error('No s’ha pogut consultar l’índex de fitxers de '+TREE_SOURCE_BRANCH+' ('+treeResponse.status+'). No s’ha creat res.');
+    var treeData=await treeResponse.json();
+    var md=(treeData.tree||[]).filter(function(x){return x.type==='blob'&&x.path.startsWith('TREEWEB_ARTICLES/')&&/\.md$/i.test(x.path);});
+    function key(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
+    var slugKey=key(node.web_slug||node.title),titleKey=key(node.title);
+    var exact=md.filter(function(x){var name=key(x.path.split('/').pop().replace(/\.md$/i,''));return name===slugKey||name===titleKey;});
+    if(exact.length===1)articlePath=exact[0].path;
+    else {
+      var stop=new Set(['a','al','con','de','del','el','ella','en','es','la','las','lo','los','o','para','por','que','se','su','y','un','una','unos','unas']);
+      function tokens(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().match(/[a-z0-9]+/g)?.filter(function(t){return t.length>1&&!stop.has(t);})||[]}
+      var target=new Set([].concat(tokens(node.web_slug||''),tokens(node.web_title||''),tokens(node.title||'')));
+      var scored=md.map(function(x){var name=x.path.split('/').pop().replace(/\.md$/i,''),candidate=new Set(tokens(name)),common=Array.from(target).filter(function(t){return candidate.has(t)}).length;return {path:x.path,score:common/Math.max(1,target.size)+common/Math.max(1,candidate.size),targetCoverage:common/Math.max(1,target.size),candidateCoverage:common/Math.max(1,candidate.size),common:common};}).filter(function(x){return x.targetCoverage>=0.6&&x.candidateCoverage>=0.7&&x.common>=2;}).sort(function(a,b){return b.score-a.score||b.common-a.common||a.path.localeCompare(b.path);});
+      if(scored.length&&(!scored[1]||Math.abs(scored[0].score-scored[1].score)>=0.12))articlePath=scored[0].path;
+    }
+  }
+  if(!articlePath||!/\.md$/i.test(articlePath)||articlePath.startsWith('/')||articlePath.split('/').includes('..'))throw new Error('No s’ha pogut resoldre una ruta Markdown inequívoca per a '+articleId+' («'+(node.title||node.node_id)+'») dins TREEWEB01. No s’ha creat res.');
   var meta=await fetchContentAtRef(articlePath,token,TREE_SOURCE_BRANCH);
   var markdown=decodePreviewFile(meta);
   var match=String(markdown).match(/^\s*#\s+(.+?)\s*#*\s*$/m);
   var heading=match?match[1].trim():'';
-  if(!heading||normalizedArticleTitle(heading)!==normalizedArticleTitle(node.title))throw new Error('El fitxer associat explícitament a '+articleId+' («'+articlePath+'») no té un títol Markdown coincident amb el node «'+node.title+'». No s’ha creat res.');
+  if(!heading)throw new Error('El Markdown associat a '+articleId+' ('+articlePath+') no té encapçalament H1. No s’ha creat res.');
   return {node:node,article_id:articleId,path:articlePath,ref:TREE_SOURCE_BRANCH,markdown:markdown,heading:heading,sha:meta.sha};
 }
 function buildNodePageSource(node,slug,markdown,children,template,ancestors){var title=canonicalTitle(node),blocks=Array.isArray(template.blocks)?template.blocks:[],blockCode=blocks.map(function(b){return '    { id: '+jsQuote(b.id||'')+', type: '+jsQuote(b.type||'')+', title: '+jsQuote(b.title||'')+', text: '+jsQuote(b.text||'')+', href: '+jsQuote(b.href||'')+', image: '+jsQuote(b.image||'')+' }'}).join(',\n'),childCode=children.map(function(c){return '  { title: '+jsQuote(c.title)+', href: '+jsQuote(c.href)+', active: '+(c.active?'true':'false')+', node_id: '+jsQuote(c.node_id||'')+(c.description?', description: '+jsQuote(c.description):'')+' }'}).join(',\n'),ancestorCode=(ancestors||[]).map(function(a){return '  { title: '+jsQuote(a.title)+', href: '+jsQuote(a.href)+', node_id: '+jsQuote(a.node_id||'')+', web_slug: '+jsQuote(a.web_slug||'')+' }'}).join(',\n');return "import PageCanvas, {type EditablePage} from '../../../components/PageCanvas';\n\nconst articleMarkdown = "+JSON.stringify(markdown)+";\nconst children = [\n"+childCode+"\n];\n\nconst page: EditablePage = {\n"+
