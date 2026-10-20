@@ -151,7 +151,7 @@ function closeLocalPreview(){byId('localPreviewModal').classList.add('hidden');b
 byId('closeLocalPreview').addEventListener('click',closeLocalPreview);byId('localPreviewModal').addEventListener('click',function(e){if(e.target===byId('localPreviewModal'))closeLocalPreview()});document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!byId('localPreviewModal').classList.contains('hidden'))closeLocalPreview();if(e.key==='Escape'&&!byId('createPageModal').classList.contains('hidden'))byId('createPageModal').classList.add('hidden')});
 
 
-var TREE_SOURCE_BRANCH='TRADEVERSE_WORK_2840',TREE_SOURCE_PATH='02_LIBRARY_NEW/STRUCTURE/LIBRARY_NEW_NODES.csv';
+var TREE_SOURCE_BRANCH='TREEWEB01',TREE_SOURCE_PATH='TREEWEB.csv';
 var canonicalArticlePaths=null,canonicalArticlePathsToken='',selectedCreateNode=null,selectedCreateChildren=[];
 function titleForExistingPage(p){var registered=configuredTargets().find(function(x){return x.path===p.path});if(registered&&registered.title)return registered.title;if(p.path==='/')return 'Portada / Inicio';return p.title||p.path}
 function existingParentPageSelector(){var pages=(currentPages||[]).filter(function(p){return p.path.indexOf('[')<0}).slice().sort(function(a,b){return a.path.localeCompare(b.path)});if(!pages.length)return '<p class="error">No hi ha pàgines concretes carregades de PAGEWEB01. Connecta primer l’editor.</p>';return '<label for="createParentPageSelect"><strong>Pàgina pare (opcional)</strong></label><select id="createParentPageSelect" style="width:100%;margin-top:8px"><option value="">— No modificar cap pàgina pare —</option>'+pages.map(function(p){return '<option value="'+esc(p.path)+'"'+(selectedParentPath===p.path?' selected':'')+'>'+esc(titleForExistingPage(p))+' · '+esc(p.path)+'</option>'}).join('')+'</select><p class="muted">Si no selecciones una pàgina pare, no s’actualitzarà cap enllaç existent.</p>'}
@@ -164,26 +164,22 @@ function slugFromCanonicalTitle(value){return String(value||'').normalize('NFD')
 function jsQuote(value){return "'"+String(value==null?'':value).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n')+"'"}
 function articleLead(markdown){var clean=String(markdown||'').replace(/^\uFEFF/,'').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/,'').replace(/^# .+\r?\n/,'');var parts=clean.split(/\r?\n\s*\r?\n/),lead=parts.map(function(x){return x.trim()}).find(function(x){return x&&!/^#{1,6}\s/.test(x)&&!/^[-*+]\s/.test(x)&&!/^>\s/.test(x)});return lead?lead.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/\s+/g,' ').slice(0,300):''}
 async function getCanonicalArticle(node,token){
- // La fila canònica identifica el node i l'article associat. Els fitxers Markdown no porten article_id al contingut, així que el criteri segur és la font editorial activa, no el nom més recent per data.
- var freshRows=await loadCanonicalTree(token),freshNode=freshRows.find(function(r){return r.node_id===node.node_id});
- if(!freshNode)throw new Error('El node '+node.node_id+' ja no existeix a l’arbre canònic actual. Torna’l a consultar.');
- node=freshNode;
- var articleId=String(node.article_id||'').trim();
- if(!articleId)throw new Error('El node «'+(node.title||node.node_id)+'» no té article_id a l’arbre canònic. No s’ha creat res.');
- var files=await loadCanonicalArticlePaths(token);
- var keys=[articleFileKey(slugFromCanonicalTitle(node.title)),articleFileKey(node.title)].filter(function(x,i,a){return x&&a.indexOf(x)===i});
- var candidates=files.filter(function(f){var base=f.path.split('/').pop().replace(/\.md$/i,'');return keys.indexOf(base)>=0;});
- // La pàgina es regenera des de l'article del node de l'arbre canònic (TRADEVERSE_WORK_2840). ARTICLES_CURRENT de main és només una font alternativa: prioritzar-la podia reutilitzar una versió antiga encara que l'article del node ja hagués canviat.
- function sourceRank(f){var p=f.path.toUpperCase();if(p.indexOf('02_LIBRARY_NEW/ARTICLES/')===0&&f.ref===TREE_SOURCE_BRANCH)return 0;if(p.indexOf('01_LIBRARY/ARTICLES_CURRENT/')===0&&f.ref==='main')return 1;if(p.indexOf('01_LIBRARY/ARTICLES_TREEREV1/')===0&&f.ref==='main')return 2;return 9;}
- candidates.sort(function(a,b){return sourceRank(a)-sourceRank(b)||a.path.localeCompare(b.path);});
- if(!candidates.length)throw new Error('No he trobat l’article associat al node «'+(node.title||node.node_id)+'» ('+articleId+'). No s’ha creat res.');
- var mismatches=[];
- for(var i=0;i<candidates.length;i++){
-  var meta=await fetchContentAtRef(candidates[i].path,token,candidates[i].ref),markdown=decodePreviewFile(meta),match=String(markdown).match(/^\s*#\s+(.+?)\s*#*\s*$/m),heading=match?match[1].trim():'';
-  if(heading&&normalizedArticleTitle(heading)===normalizedArticleTitle(node.title))return {node:node,article_id:articleId,path:candidates[i].path,ref:candidates[i].ref,markdown:markdown,heading:heading};
-  mismatches.push(candidates[i].ref+':'+candidates[i].path+(heading?' («'+heading+'»)':''));
- }
- throw new Error('He trobat fitxers candidats però cap té el títol del node «'+(node.title||node.node_id)+'» ('+articleId+'): '+mismatches.join(', ')+'. No s’ha creat res.');
+  // TREEWEB.csv és la relació canònica node_id -> article_id -> article_file.
+  // El Markdown no porta article_id: no s'ha d'inferir el fitxer pel títol.
+  var freshRows=await loadCanonicalTree(token);
+  var freshNode=freshRows.find(function(r){return r.node_id===node.node_id;});
+  if(!freshNode)throw new Error('El node '+node.node_id+' ja no existeix a TREEWEB01. No s’ha creat res.');
+  node=freshNode;
+  var articleId=String(node.article_id||'').trim();
+  var articlePath=String(node.article_file||'').trim();
+  if(!articleId)throw new Error('El node «'+(node.title||node.node_id)+'» no té article_id a TREEWEB.csv. No s’ha creat res.');
+  if(!articlePath||!/\.md$/i.test(articlePath)||articlePath.startsWith('/')||articlePath.split('/').includes('..'))throw new Error('L’article '+articleId+' del node «'+(node.title||node.node_id)+'» no té una ruta article_file vàlida a TREEWEB.csv. No s’ha creat res.');
+  var meta=await fetchContentAtRef(articlePath,token,TREE_SOURCE_BRANCH);
+  var markdown=decodePreviewFile(meta);
+  var match=String(markdown).match(/^\s*#\s+(.+?)\s*#*\s*$/m);
+  var heading=match?match[1].trim():'';
+  if(!heading||normalizedArticleTitle(heading)!==normalizedArticleTitle(node.title))throw new Error('El fitxer associat explícitament a '+articleId+' («'+articlePath+'») no té un títol Markdown coincident amb el node «'+node.title+'». No s’ha creat res.');
+  return {node:node,article_id:articleId,path:articlePath,ref:TREE_SOURCE_BRANCH,markdown:markdown,heading:heading,sha:meta.sha};
 }
 function buildNodePageSource(node,slug,markdown,children,template,ancestors){var title=canonicalTitle(node),blocks=Array.isArray(template.blocks)?template.blocks:[],blockCode=blocks.map(function(b){return '    { id: '+jsQuote(b.id||'')+', type: '+jsQuote(b.type||'')+', title: '+jsQuote(b.title||'')+', text: '+jsQuote(b.text||'')+', href: '+jsQuote(b.href||'')+', image: '+jsQuote(b.image||'')+' }'}).join(',\n'),childCode=children.map(function(c){return '  { title: '+jsQuote(c.title)+', href: '+jsQuote(c.href)+', active: '+(c.active?'true':'false')+', node_id: '+jsQuote(c.node_id||'')+(c.description?', description: '+jsQuote(c.description):'')+' }'}).join(',\n'),ancestorCode=(ancestors||[]).map(function(a){return '  { title: '+jsQuote(a.title)+', href: '+jsQuote(a.href)+', node_id: '+jsQuote(a.node_id||'')+', web_slug: '+jsQuote(a.web_slug||'')+' }'}).join(',\n');return "import PageCanvas, {type EditablePage} from '../../../components/PageCanvas';\n\nconst articleMarkdown = "+JSON.stringify(markdown)+";\nconst children = [\n"+childCode+"\n];\n\nconst page: EditablePage = {\n"+
 "  id: "+jsQuote('node-'+node.node_id)+",\n  kind: 'article-children',\n  title: "+jsQuote(title)+",\n  path: "+jsQuote('/biblioteca/'+slug)+",\n  node_id: "+jsQuote(node.node_id)+",\n  template: 'article-children',\n  template_id: 'article-children',\n  background: "+jsQuote(template.background||'#fafbfc')+",\n  color: "+jsQuote(template.color||'#173246')+",\n  accent: "+jsQuote(template.accent||'#116c70')+",\n  width: "+Number(template.width||1220)+",\n  gap: "+Number(template.gap||24)+",\n  columns: "+Number(template.columns||4)+",\n  design_version: "+Number(template.design_version||3)+",\n  header_background: "+jsQuote(template.header_background||'#031419')+",\n  header_color: "+jsQuote(template.header_color||'#f3f2ee')+",\n  blocks: [\n"+blockCode+"\n  ],\n  description: "+jsQuote(node.web_description||articleLead(markdown))+",\n  markdown: articleMarkdown,\n  children: children,\n  ancestors: [\n"+ancestorCode+"\n  ]\n};\n\nexport default function GeneratedNodePage(){ return <PageCanvas page={page}/>; }\n"}
