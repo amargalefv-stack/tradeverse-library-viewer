@@ -187,9 +187,18 @@ if(!confirm('Eliminar definitivament '+path+' de la branca PAGEWEB01? Es crearà
 button.disabled=true;var old=button.textContent;button.textContent='Esborrant…';
 try{
 var url='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+path.split('/').map(encodeURIComponent).join('/');
-var resp=await fetch(url,{method:'DELETE',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({message:'Delete page '+path,sha:sha,branch:BRANCH})});
+var resp=await fetch(url+'?ref='+encodeURIComponent(BRANCH),{method:'DELETE',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({message:'Delete page '+path,sha:sha,branch:BRANCH}),cache:'no-store'});
 if(!resp.ok){var detail='HTTP '+resp.status;try{var b=await resp.json();detail=b.message||detail}catch(x){}throw new Error(detail+' — el token necessita Contents: write.')}
-button.textContent='Eliminada';if(byId('publishStatus'))byId('publishStatus').textContent='Pàgina eliminada de PAGEWEB01. Prem Actualitzar per recarregar la llista.';
+var route=path.replace(/^web\\/app\\//,'').replace(/\\/page\\.(tsx|jsx|ts|js)$/,'').replace(/\\.(tsx|jsx|ts|js)$/,'');
+route=route?'/'+route:'/';
+currentPages=currentPages.filter(function(p){return p.source!==path&&p.path!==route});
+delete previewByPath[route];
+if(selectedPath===route)selectedPath=null;
+byId('pageCount').textContent='('+currentPages.length+')';
+renderCurrent();
+button.disabled=false;
+if(byId('publishStatus'))byId('publishStatus').textContent='Pàgina eliminada de PAGEWEB01. La llista local s’ha actualitzat; ja pots tornar-la a crear.';
+if(byId('updated'))byId('updated').textContent='Pàgina eliminada de GitHub · '+route;
 }catch(err){alert('No s’ha pogut esborrar: '+err.message);button.disabled=false;button.textContent=old}
 };
 async function fetchWithTimeout(url,options,timeoutMs){var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},timeoutMs||12000);try{return await fetch(url,Object.assign({},options||{},{signal:controller.signal,cache:'no-store'}))}catch(e){if(e&&e.name==='AbortError')throw new Error('Temps d’espera esgotat en consultar GitHub. Torna-ho a provar; no s’ha fet cap canvi.');throw e}finally{clearTimeout(timer)}}
