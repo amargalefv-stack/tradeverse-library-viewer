@@ -213,9 +213,9 @@ var userResp=await fetchWithTimeout('https://api.github.com/user',{headers:heade
 if(!userResp.ok)throw new Error('Token rebutjat (HTTP '+userResp.status+'). Revisa que sigui vigent.');
 show('2/4 · Comprovant l’accés al repositori…',false);var repoResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO,{headers:headers},12000);
 if(!repoResp.ok)throw new Error('No tens accés al repositori '+REPO+' (HTTP '+repoResp.status+'). Revisa l’accés i els permisos Contents: read.');
-show('3/4 · Llegint les pàgines de PAGEWEB01…',false);var treeResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+BRANCH+'?recursive=1',{headers:headers},20000);
+show('3/4 · Llegint totes les pàgines de PAGEWEB01 (pot trigar uns segons)…',false);var treeResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+BRANCH+'?recursive=1',{headers:headers},30000);
 if(!treeResp.ok)throw new Error('No es pot llegir la branca '+BRANCH+' (HTTP '+treeResp.status+').');
-var tree=await treeResp.json();
+var tree;try{tree=await treeResp.json()}catch(parseError){throw new Error('GitHub ha retornat una resposta invàlida en llegir les pàgines. Torna-ho a provar. Detall: '+String(parseError.message||parseError))}if(!tree||!Array.isArray(tree.tree))throw new Error('GitHub no ha retornat la llista de fitxers esperada per a '+BRANCH+'.');
 previewByPath={};previewBaseUrl='';previewPermissionMessage='';
 try{
 var previewResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:headers},12000);
@@ -246,7 +246,7 @@ byId('branch').textContent='Connectat · '+BRANCH+' · '+pages.length+' pàgines
 currentPages=pages;byId('pageCount').textContent='('+pages.length+')';
 show('4/4 · Carregant les plantilles…',false);var cfgResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/page-editor.json?ref='+encodeURIComponent(BRANCH),{headers:headers},12000);
 if(!cfgResp.ok)throw new Error('Les pàgines s’han carregat, però no es pot llegir web/data/page-editor.json per mostrar les plantilles (HTTP '+cfgResp.status+').');
-var cfgMeta=await cfgResp.json();configSha=cfgMeta.sha;var cfg=JSON.parse(decodeURIComponent(escape(atob((cfgMeta.content||'').replace(/\s/g,'')))));currentConfig=cfg;currentTemplates=Array.isArray(cfg.templates)?cfg.templates:[];if(cfg.preview&&Array.isArray(cfg.preview.templates))currentTemplates=currentTemplates.concat(cfg.preview.templates.filter(function(t){return !currentTemplates.some(function(x){return x.id===t.id})}));byId('templateCount').textContent='('+currentTemplates.length+')';updateTemplateApply();
+var cfgMeta;try{cfgMeta=await cfgResp.json()}catch(cfgParseError){throw new Error('GitHub ha retornat una resposta invàlida en llegir les plantilles.')}if(!cfgMeta||!cfgMeta.content||!cfgMeta.sha)throw new Error('El fitxer de configuració de plantilles no conté dades vàlides.');configSha=cfgMeta.sha;var cfg;try{cfg=JSON.parse(decodeURIComponent(escape(atob((cfgMeta.content||'').replace(/\s/g,'')))))}catch(cfgDecodeError){throw new Error('No es pot descodificar web/data/page-editor.json: '+String(cfgDecodeError.message||cfgDecodeError))}currentConfig=cfg;currentTemplates=Array.isArray(cfg.templates)?cfg.templates:[];if(cfg.preview&&Array.isArray(cfg.preview.templates))currentTemplates=currentTemplates.concat(cfg.preview.templates.filter(function(t){return !currentTemplates.some(function(x){return x.id===t.id})}));byId('templateCount').textContent='('+currentTemplates.length+')';updateTemplateApply();
 byId('updated').textContent=previewPermissionMessage||'Carregat correctament'; if(previewPermissionMessage){byId('updated').className='muted error'; if(byId('publishStatus'))byId('publishStatus').textContent=previewPermissionMessage;} 
 }catch(e){show('No s’ha pogut carregar l’editor: '+String(e.message||e).replace(/</g,'&lt;'),true)}
 finally{btn.disabled=false;btn.textContent='Connectar'}
