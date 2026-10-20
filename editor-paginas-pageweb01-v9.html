@@ -191,23 +191,24 @@ if(!resp.ok){var detail='HTTP '+resp.status;try{var b=await resp.json();detail=b
 button.textContent='Eliminada';if(byId('publishStatus'))byId('publishStatus').textContent='Pàgina eliminada de PAGEWEB01. Prem Actualitzar per recarregar la llista.';
 }catch(err){alert('No s’ha pogut esborrar: '+err.message);button.disabled=false;button.textContent=old}
 };
+async function fetchWithTimeout(url,options,timeoutMs){var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},timeoutMs||12000);try{return await fetch(url,Object.assign({},options||{},{signal:controller.signal,cache:'no-store'}))}catch(e){if(e&&e.name==='AbortError')throw new Error('Temps d’espera esgotat en consultar GitHub. Torna-ho a provar; no s’ha fet cap canvi.');throw e}finally{clearTimeout(timer)}}
 window.connectEditor=async function(){
 var t=byId('token').value.trim();
 if(!t){show('Falta el token. Enganxa un token vigent de GitHub i prem Connectar.',true);return}
 var btn=byId('connect');btn.disabled=true;btn.textContent='Connectant…';
-show('Provant el token i llegint PAGEWEB01…',false);
+show('1/4 · Verificant el token de GitHub…',false);
 var headers={Accept:'application/vnd.github+json',Authorization:'Bearer '+t,'X-GitHub-Api-Version':'2022-11-28'};
 try{
-var userResp=await fetch('https://api.github.com/user',{headers:headers});
+var userResp=await fetchWithTimeout('https://api.github.com/user',{headers:headers},12000);
 if(!userResp.ok)throw new Error('Token rebutjat (HTTP '+userResp.status+'). Revisa que sigui vigent.');
-var repoResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO,{headers:headers});
+show('2/4 · Comprovant l’accés al repositori…',false);var repoResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO,{headers:headers},12000);
 if(!repoResp.ok)throw new Error('No tens accés al repositori '+REPO+' (HTTP '+repoResp.status+'). Revisa l’accés i els permisos Contents: read.');
-var treeResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+BRANCH+'?recursive=1',{headers:headers});
+show('3/4 · Llegint les pàgines de PAGEWEB01…',false);var treeResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/git/trees/'+BRANCH+'?recursive=1',{headers:headers},20000);
 if(!treeResp.ok)throw new Error('No es pot llegir la branca '+BRANCH+' (HTTP '+treeResp.status+').');
 var tree=await treeResp.json();
 previewByPath={};previewBaseUrl='';previewPermissionMessage='';
 try{
-var previewResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:headers});
+var previewResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/preview-deployments.json?ref='+encodeURIComponent(BRANCH),{headers:headers},12000);
 if(previewResp.ok){
 var previewMeta=await previewResp.json();
 var encoded=(previewMeta.content||'').split(String.fromCharCode(10)).join('').split(String.fromCharCode(13)).join('').split(' ').join('');
@@ -233,11 +234,11 @@ var seen={};var pages=files.map(function(f){var s=f.path.replace(/^web\/app\//,'
 if(!pages.length)throw new Error('Connexió correcta, però no s’han trobat fitxers de pàgina dins web/app a '+BRANCH+'.');
 byId('branch').textContent='Connectat · '+BRANCH+' · '+pages.length+' pàgines';byId('branch').className='pill';
 currentPages=pages;byId('pageCount').textContent='('+pages.length+')';
-var cfgResp=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/page-editor.json?ref='+encodeURIComponent(BRANCH),{headers:headers});
+show('4/4 · Carregant les plantilles…',false);var cfgResp=await fetchWithTimeout('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/web/data/page-editor.json?ref='+encodeURIComponent(BRANCH),{headers:headers},12000);
 if(!cfgResp.ok)throw new Error('Les pàgines s’han carregat, però no es pot llegir web/data/page-editor.json per mostrar les plantilles (HTTP '+cfgResp.status+').');
 var cfgMeta=await cfgResp.json();configSha=cfgMeta.sha;var cfg=JSON.parse(decodeURIComponent(escape(atob((cfgMeta.content||'').replace(/\\s/g,'')))));currentConfig=cfg;currentTemplates=Array.isArray(cfg.templates)?cfg.templates:[];if(cfg.preview&&Array.isArray(cfg.preview.templates))currentTemplates=currentTemplates.concat(cfg.preview.templates.filter(function(t){return !currentTemplates.some(function(x){return x.id===t.id})}));byId('templateCount').textContent='('+currentTemplates.length+')';updateTemplateApply();
 byId('updated').textContent=previewPermissionMessage||'Carregat correctament'; if(previewPermissionMessage){byId('updated').className='muted error'; if(byId('publishStatus'))byId('publishStatus').textContent=previewPermissionMessage;} 
-}catch(e){show(String(e.message||e).replace(/</g,'&lt;'),true)}
+}catch(e){show('No s’ha pogut carregar l’editor: '+String(e.message||e).replace(/</g,'&lt;'),true)}
 finally{btn.disabled=false;btn.textContent='Connectar'}
 };
 function configuredTargets(){var c=currentConfig||{},all=[];(Array.isArray(c.pages)?c.pages:[]).forEach(function(p){if(p&&p.path)all.push(p)});(c.preview&&Array.isArray(c.preview.pages)?c.preview.pages:[]).forEach(function(p){if(p&&p.path&&!all.some(function(x){return x.path===p.path}))all.push(p)});if(c.library_index&&c.library_index.path&&!all.some(function(x){return x.path===c.library_index.path}))all.push(c.library_index);return all}
