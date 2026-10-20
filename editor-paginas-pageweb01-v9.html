@@ -122,15 +122,18 @@ function localErrorPage(msg){return '<!doctype html><html lang="ca"><meta charse
 async function embedPreviewImages(html,css,t){var paths=[],r=/\/images\/[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|gif|avif)/g,m;while((m=r.exec(css+'\n'+html))!==null)if(!paths.includes(m[0]))paths.push(m[0]);var map={};await Promise.all(paths.map(async function(p){try{var file=await getPreviewFile('web/public'+p,t),b=String(file.content||'').replace(/\s/g,'');if(!b)return;var ext=p.split('.').pop().toLowerCase(),mime=ext==='svg'?'image/svg+xml':ext==='png'?'image/png':(ext==='jpg'||ext==='jpeg')?'image/jpeg':ext==='gif'?'image/gif':ext==='avif'?'image/avif':'image/webp';map[p]='data:'+mime+';base64,'+b}catch(e){}}));Object.keys(map).forEach(function(p){html=html.split(p).join(map[p]);css=css.split(p).join(map[p])});return {html:html,css:css}}
 async function renderActualLanding(source,token){
 var files=await Promise.all([getPreviewText('web/app/globals.css',token),getPreviewText('web/styles/trading-criteria-system.css',token),getPreviewText('web/app/landing-refresh.css',token)]);
-var publicRoot='https://raw.githubusercontent.com/'+OWNER+'/'+REPO+'/'+BRANCH+'/web/public';
-var css=files.join('\n').replace(/url\(\s*(['"]?)(\/images\/[^)'"]+)\1\s*\)/g,function(full,q,p){return 'url("'+publicRoot+p+'")'}).replace(/<\/style/gi,'<\\/style');
-var cleanSource=source.replace(/^\s*import\s+['"][^'"]+\.css['"];\s*/gm,'').replace(/export\s+default\s+function\s+Home\s*\(/,'function Home(');
-var payload=btoa(unescape(encodeURIComponent(JSON.stringify({source:cleanSource,publicRoot:publicRoot}))));
+var publicRoot='https://raw.githubusercontent.com/'+OWNER+'/'+REPO+'/'+BRANCH+'/web/public',cssSource=files.join('\n'),cleanSource=source.replace(/^\s*import\s+['"][^'"]+\.css['"];\s*/gm,'').replace(/export\s+default\s+function\s+Home\s*\(/,'function Home('),imagePaths=[];
+var direct=/\/images\/[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|gif|avif)/g,m;
+[cssSource,cleanSource].forEach(function(txt){while((m=direct.exec(txt))!==null)if(!imagePaths.includes(m[0]))imagePaths.push(m[0]);direct.lastIndex=0});
+var dynamic=/\+\[([^\]]+)\]\[i\]/g,dm;while((dm=dynamic.exec(cleanSource))!==null){var names=[...dm[1].matchAll(/['"]([^'"]+)['"]/g)];names.forEach(function(n){var p='/images/landing-v2/'+n[1]+'.webp';if(!imagePaths.includes(p))imagePaths.push(p)})}
+var images={};await Promise.all(imagePaths.map(async function(p){try{var f=await getPreviewFile('web/public'+p,token),data=String(f.content||'').replace(/\s/g,'');if(!data)return;var ext=p.split('.').pop().toLowerCase(),mime=ext==='svg'?'image/svg+xml':ext==='png'?'image/png':(ext==='jpg'||ext==='jpeg')?'image/jpeg':ext==='gif'?'image/gif':ext==='avif'?'image/avif':'image/webp';images[p]='data:'+mime+';base64,'+data}catch(ignore){}}));
+var css=cssSource.replace(/url\(\s*(['"]?)(\/images\/[^)'"]+)\1\s*\)/g,function(full,q,p){return 'url("'+(images[p]||publicRoot+p)+'")'}).replace(/<\/style/gi,'<\\/style');
+var payload=btoa(unescape(encodeURIComponent(JSON.stringify({source:cleanSource,publicRoot:publicRoot,images:images}))));
 var boot='var cfg=JSON.parse(decodeURIComponent(escape(atob("'+payload+'"))));'+
 'try{var transformed=Babel.transform(cfg.source,{filename:"page.tsx",presets:[["typescript",{allExtensions:true,isTSX:true}],["react",{runtime:"classic"}]]}).code;'+
 'var Home=(new Function("React",transformed+";return Home;"))(React);'+
 'var html=ReactDOMServer.renderToStaticMarkup(React.createElement(Home));'+
-'html=html.replace(/(src=")(\\/images\\/[^"]+)/g,function(full,a,p){return a+cfg.publicRoot+p});'+
+'html=html.replace(/(src=")(\\/images\\/[^"]+)/g,function(full,a,p){return a+(cfg.images[p]||cfg.publicRoot+p)});'+
 'var root=document.getElementById("previewRoot");root.innerHTML=html;'+
 'root.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.charAt(0)!=="#"){e.preventDefault();e.stopPropagation()}});'+
 'root.querySelectorAll("form").forEach(function(f){f.addEventListener("submit",function(e){e.preventDefault()})});document.title="Preview fidel · Trading Criteria"'+
