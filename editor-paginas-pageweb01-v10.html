@@ -390,7 +390,16 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     try{
       var raw=await get('contents/'+TREE_PATH.split('/').map(encodeURIComponent).join('/'),TREE_BRANCH,token);
       var csv=raw.content&&raw.encoding==='base64'?decode64(raw.content):String(raw.content||'');
-      if(!csv.trim())throw new Error('No s’ha pogut llegir el contingut de '+TREE_PATH+' a '+TREE_BRANCH+'.');
+      if(!csv.trim()){
+        var treeRows=await get('git/trees/'+encodeURIComponent(TREE_BRANCH)+'?recursive=1',null,token);
+        if(treeRows.truncated)throw new Error('GitHub ha truncat l’índex de TREEWEB01; no és segur mostrar una llista parcial.');
+        var csvEntry=(treeRows.tree||[]).find(function(x){return x.path===TREE_PATH&&x.type==='blob'});
+        if(!csvEntry)throw new Error('No s’ha trobat '+TREE_PATH+' a '+TREE_BRANCH+'.');
+        var blob=await get('git/blobs/'+csvEntry.sha,null,token);
+        if(blob.encoding!=='base64'||!blob.content)throw new Error('No s’ha pogut llegir el CSV canònic de l’arbre.');
+        csv=decode64(blob.content);
+      }
+      if(!csv.trim())throw new Error('El CSV de '+TREE_PATH+' és buit a '+TREE_BRANCH+'.');
       nodes=parseCsv(csv);
       var tree=await get('git/trees/'+encodeURIComponent(PAGE_BRANCH)+'?recursive=1',null,token);
       if(tree.truncated)throw new Error('GitHub ha truncat la llista de fitxers de PAGEWEB01; no es mostren resultats incomplets.');
