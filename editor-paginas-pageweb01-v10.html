@@ -305,11 +305,11 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
       <button id="closeAssignPages" type="button">Tancar</button>
     </div>
     <div class="create-page-body">
-      <div class="bar" style="margin-bottom:12px"><input id="assignSearch" type="search" placeholder="Filtra nodes o pàgines per nom, ID o ruta…"><button id="loadAssignData" class="primary" type="button">Carregar / actualitzar</button></div>
+      <div class="bar" style="margin-bottom:12px"><input id="assignSearch" type="search" placeholder="Filtra nodes de TREEWEB01 per nom o ID…"><button id="loadAssignData" class="primary" type="button">Carregar / actualitzar</button></div>
       <div id="assignPagesStatus" class="note" aria-live="polite">Prem «Carregar / actualitzar» per llegir l’arbre i les pàgines de les branques corresponents.</div>
       <div class="assign-two-col">
         <section class="panel"><h2>1. Nodes de TREEWEB01 <span id="assignNodeCount" class="pill">0</span></h2><div id="assignNodeList" class="list" style="max-height:55vh"><div class="empty">Encara no s’han carregat els nodes.</div></div></section>
-        <section class="panel"><h2>2. Possibles pàgines de PAGEWEB01 <span id="assignPageCount" class="pill">0</span></h2><div id="assignCandidateList" class="list" style="max-height:55vh"><div class="empty">Selecciona un node de la primera columna.</div></div></section>
+        <section class="panel"><h2>2. Possibles pàgines de PAGEWEB01 <span id="assignPageCount" class="pill">0</span></h2><div class="assign-page-filter"><input id="assignPageSearch" type="search" placeholder="Filtra pàgines candidates per nom o ruta…" aria-label="Filtra pàgines candidates"></div><div id="assignCandidateList" class="list" style="max-height:55vh"><div class="empty">Selecciona un node de la primera columna.</div></div></section>
       </div>
       <div id="assignSelectionSummary" class="note">Selecciona primer un node i després una possible pàgina per veure la correspondència.</div>
       <p class="note">Aquesta pantalla carrega dades reals de GitHub. En aquesta fase la selecció és de consulta: no desa assignacions, no modifica articles ni configuració i no publica a Vercel.</p>
@@ -325,7 +325,7 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
 .assign-row.selected{background:#e6f5f5;outline:2px solid var(--accent);outline-offset:-2px}
 .assign-row strong{display:block;font-size:13px}
 .assign-row .muted{display:block;margin-top:3px}
-.assign-match{display:inline-block;margin-top:5px;padding:2px 6px;border-radius:5px;background:#e5eef2;font-size:11px}\n.assign-detection{padding:12px;border-bottom:1px solid var(--line);background:#f8fbfc}.assign-detection>strong{display:block;margin-bottom:5px}.assign-detection>.muted{display:block;margin-bottom:7px}.assign-found{background:#f6fafb}.assign-suggestion-heading{padding:11px 12px;font-weight:700;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:#f8fbfc}
+.assign-match{display:inline-block;margin-top:5px;padding:2px 6px;border-radius:5px;background:#e5eef2;font-size:11px}\n.assign-page-filter{padding:9px 10px;border-bottom:1px solid var(--line);background:#fbfdfe}.assign-page-filter input{width:100%;min-width:0;padding:8px 10px;font-size:12px}.assign-detection{padding:12px;border-bottom:1px solid var(--line);background:#f8fbfc}.assign-detection>strong{display:block;margin-bottom:5px}.assign-detection>.muted{display:block;margin-bottom:7px}.assign-found{background:#f6fafb}.assign-suggestion-heading{padding:11px 12px;font-weight:700;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:#f8fbfc}
 @media(max-width:760px){.assign-two-col{grid-template-columns:1fr}.assign-two-col .list{max-height:32vh!important}}
 </style>
 <script>
@@ -409,7 +409,7 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     el('assignNodeList').innerHTML=list.length?list.map(function(n){var active=n.node_id===selectedNodeId;return '<div tabindex="0" role="button" class="assign-row '+(active?'selected':'')+'" data-node-id="'+esc(n.node_id)+'"><strong>'+esc(n.title||nodeName(n))+'</strong><span class="muted">'+esc(n.node_id)+(n.parent_id?' · Pare: '+esc(n.parent_id):'')+'</span></div>'}).join(''):'<div class="empty">No hi ha nodes que coincideixin amb el filtre.</div>';
   }
   function renderCandidates(){
-    var q=el('assignSearch').value.trim().toLowerCase(),n=nodes.find(function(x){return x.node_id===selectedNodeId});
+    var q=el('assignPageSearch').value.trim().toLowerCase(),n=nodes.find(function(x){return x.node_id===selectedNodeId});
     el('assignPageCount').textContent=String(pages.length);
     if(!n){el('assignCandidateList').innerHTML='<div class="empty">Selecciona un node de la primera columna.</div>';el('assignSelectionSummary').textContent='Selecciona primer un node i després una possible pàgina.';return}
     var rawMatches=cardsForNode(n),matches=[],grouped={};
@@ -464,7 +464,8 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
   el('closeAssignPages').addEventListener('click',function(){el('assignPagesModal').classList.add('hidden')});
   el('assignPagesModal').addEventListener('click',function(e){if(e.target===el('assignPagesModal'))el('assignPagesModal').classList.add('hidden')});
   el('loadAssignData').addEventListener('click',load);
-  el('assignSearch').addEventListener('input',function(){renderNodes();renderCandidates()});
+  el('assignSearch').addEventListener('input',renderNodes);
+  el('assignPageSearch').addEventListener('input',renderCandidates);
   el('assignNodeList').addEventListener('click',function(e){var r=e.target.closest('[data-node-id]');if(r){selectedNodeId=r.getAttribute('data-node-id');var n=nodes.find(function(x){return x.node_id===selectedNodeId});selectedCandidatePath=n?associatedTargetPath(n):'';renderNodes();renderCandidates()}});
   el('assignNodeList').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){var r=e.target.closest('[data-node-id]');if(r){e.preventDefault();selectedNodeId=r.getAttribute('data-node-id');var n=nodes.find(function(x){return x.node_id===selectedNodeId});selectedCandidatePath=n?associatedTargetPath(n):'';renderNodes();renderCandidates()}}});
   el('assignCandidateList').addEventListener('click',function(e){var r=e.target.closest('[data-candidate-path]');if(r){selectedCandidatePath=r.getAttribute('data-candidate-path');renderCandidates()}});
