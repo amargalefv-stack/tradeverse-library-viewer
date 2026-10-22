@@ -435,6 +435,7 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     el('assignSelectionSummary').innerHTML='<strong>Node:</strong> '+esc(nodeName(n))+' ('+esc(n.node_id)+')'+(chosen?' &nbsp; <strong>Pàgina seleccionada:</strong> '+esc(chosen.title)+' · '+esc(chosen.path):' &nbsp; No hi ha cap pàgina seleccionada.')+(originMatch?' &nbsp; <strong>Verificada des de targeta detectada a:</strong> '+esc(originMatch.sourcePaths.join(' · ')):'');
     var assignBtn=el('assignLinkButton');if(assignBtn)assignBtn.disabled=!(chosen&&rawMatches.length&&!cardScanErrors.length);
     var writeStatus=el('assignLinkStatus');if(writeStatus&&!(chosen&&rawMatches.length&&!cardScanErrors.length)){writeStatus.textContent=cardScanErrors.length?'No es pot assignar amb seguretat: hi ha fitxers de pàgina que no s’han pogut llegir.':(!rawMatches.length?'No s’han detectat targetes associades a aquest node.':(!chosen?'Selecciona una pàgina destí a la columna dreta.':''))}
+  }
   async function assignSelectedLink(){
     var token=el('token').value.trim(),n=nodes.find(function(x){return x.node_id===selectedNodeId}),dest=pages.find(function(p){return normalizeRoute(p.path)===normalizeRoute(selectedCandidatePath)});
     if(!token){el('assignLinkStatus').textContent='Introdueix primer el token de GitHub a la part superior.';return}
@@ -480,7 +481,6 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     }catch(e){
       status.textContent=(updatedFiles.length?'AVÍS: només una part dels fitxers s’ha pogut desar ('+updatedFiles.join(', ')+'). ':'No s’ha completat l’assignació. ')+String(e.message||e);
     }finally{btn.textContent=old;renderCandidates()}
-  }
   }
   async function load(){
     var token=el('token').value.trim();if(!token){el('assignPagesStatus').innerHTML='<span class="error">Introdueix primer el token GitHub a la part superior i torna a carregar.</span>';return}
