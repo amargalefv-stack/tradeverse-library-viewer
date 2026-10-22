@@ -412,13 +412,15 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     var q=el('assignSearch').value.trim().toLowerCase(),n=nodes.find(function(x){return x.node_id===selectedNodeId});
     el('assignPageCount').textContent=String(pages.length);
     if(!n){el('assignCandidateList').innerHTML='<div class="empty">Selecciona un node de la primera columna.</div>';el('assignSelectionSummary').textContent='Selecciona primer un node i després una possible pàgina.';return}
-    var matches=cardsForNode(n),resolvedPaths=[],detection='';
+    var rawMatches=cardsForNode(n),matches=[],grouped={};
+    rawMatches.forEach(function(c){var key=normalizeRoute(c.href)+'|'+slug(c.title);if(!grouped[key]){grouped[key]={title:c.title,href:c.href,nodeId:c.nodeId||'',source:c.source,sourcePaths:[]};matches.push(grouped[key])}var sources=grouped[key].sourcePaths;if(sources.indexOf(c.sourcePath)<0)sources.push(c.sourcePath)});
+    var resolvedPaths=[],detection='';
     if(matches.length){
       detection='<div class="assign-detection"><strong>Correspondència trobada a una targeta real</strong><span class="muted">S’ha buscat pel títol/ID de la targeta i s’ha verificat el seu href contra les pàgines existents de PAGEWEB01.</span>';
       matches.forEach(function(c){
         var target=pages.find(function(p){return normalizeRoute(p.path)===normalizeRoute(c.href)});
-        if(target){resolvedPaths.push(target.path);detection+='<div tabindex="0" role="button" class="assign-row assign-found '+(selectedCandidatePath===target.path?'selected':'')+'" data-candidate-path="'+esc(target.path)+'"><strong>Targeta: '+esc(c.title)+' → pàgina destí trobada</strong><span class="muted">Pàgina origen: '+esc(c.sourcePath)+' · href real: '+esc(c.href)+'</span><span class="muted">Ruta confirmada: '+esc(target.path)+'</span><span class="muted">Fitxer destí: '+esc(target.source)+'</span></div>'}
-        else{detection+='<div class="assign-row assign-found"><strong>Targeta: '+esc(c.title)+'</strong><span class="muted">Pàgina origen: '+esc(c.sourcePath)+' · href real: '+esc(c.href)+'</span><span class="warn">La targeta existeix, però la ruta no s’ha trobat entre les pàgines carregades de PAGEWEB01.</span></div>'}
+        if(target){if(resolvedPaths.indexOf(target.path)<0)resolvedPaths.push(target.path);detection+='<div tabindex="0" role="button" class="assign-row assign-found '+(selectedCandidatePath===target.path?'selected':'')+'" data-candidate-path="'+esc(target.path)+'"><strong>Targeta: '+esc(c.title)+' → una pàgina destí trobada</strong><span class="muted">Pàgina/es origen: '+esc(c.sourcePaths.join(' · '))+'</span><span class="muted">href real: '+esc(c.href)+'</span><span class="muted">Ruta confirmada: '+esc(target.path)+'</span><span class="muted">Fitxer destí: '+esc(target.source)+'</span></div>'}
+        else{detection+='<div class="assign-row assign-found"><strong>Targeta: '+esc(c.title)+'</strong><span class="muted">Pàgina/es origen: '+esc(c.sourcePaths.join(' · '))+'</span><span class="muted">href real: '+esc(c.href)+'</span><span class="warn">La targeta existeix, però la ruta no s’ha trobat entre les pàgines carregades de PAGEWEB01.</span></div>'}
       });
       detection+='</div>';
     }else if(cardScanErrors.length){detection='<div class="assign-detection"><strong>No es pot confirmar la correspondència</strong><span class="muted">La lectura de '+cardScanErrors.length+' fitxer(s) de pàgina ha fallat. Els resultats de targetes poden ser incomplets.</span></div>'}
@@ -429,7 +431,7 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     el('assignCandidateList').innerHTML=detection+suggestions;
     var chosen=pages.find(function(p){return p.path===selectedCandidatePath});
     var originMatch=matches.find(function(c){var p=pages.find(function(x){return normalizeRoute(x.path)===normalizeRoute(c.href)});return p&&p.path===selectedCandidatePath});
-    el('assignSelectionSummary').innerHTML='<strong>Node:</strong> '+esc(nodeName(n))+' ('+esc(n.node_id)+')'+(chosen?' &nbsp; <strong>Pàgina seleccionada:</strong> '+esc(chosen.title)+' · '+esc(chosen.path):' &nbsp; No hi ha cap pàgina seleccionada.')+(originMatch?' &nbsp; <strong>Verificada des de la targeta de:</strong> '+esc(originMatch.sourcePath):'');
+    el('assignSelectionSummary').innerHTML='<strong>Node:</strong> '+esc(nodeName(n))+' ('+esc(n.node_id)+')'+(chosen?' &nbsp; <strong>Pàgina seleccionada:</strong> '+esc(chosen.title)+' · '+esc(chosen.path):' &nbsp; No hi ha cap pàgina seleccionada.')+(originMatch?' &nbsp; <strong>Verificada des de targeta detectada a:</strong> '+esc(originMatch.sourcePaths.join(' · ')):'');
   }
   async function load(){
     var token=el('token').value.trim();if(!token){el('assignPagesStatus').innerHTML='<span class="error">Introdueix primer el token GitHub a la part superior i torna a carregar.</span>';return}
