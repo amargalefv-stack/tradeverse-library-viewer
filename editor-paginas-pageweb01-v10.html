@@ -142,167 +142,7 @@ var boot='var cfg=JSON.parse(decodeURIComponent(escape(atob("'+payload+'"))));'+
 'root.querySelectorAll("form").forEach(function(f){f.addEventListener("submit",function(e){e.preventDefault()})});document.title="Preview fidel · Trading Criteria"'+
 '}catch(e){var d=document.createElement("div");d.style.cssText="font:15px/1.6 system-ui;padding:30px;color:#173246";var h=document.createElement("h2");h.textContent="El Preview fidel no se ha podido renderizar";var p=document.createElement("p");p.textContent=String(e&&e.message||e);var n=document.createElement("p");n.textContent="No se ha hecho ningun deploy a Vercel.";d.append(h,p,n);document.body.replaceChildren(d)}';
 var closeTag='<'+'/script>';
-return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preview fiel</title><style>'+css+'</style></head><body><div id="previewRoot"></div><script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js">'+closeTag+'<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom-server-legacy.browser.production.min.js">'+closeTag+'<script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js">'+closeTag+'<script>'+boot+closeTag+'
-<div id="assignPagesModal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="assignPagesTitle">
-  <div class="create-page-dialog">
-    <div class="preview-head">
-      <div><strong id="assignPagesTitle">Assignar pàgines · Consulta inicial</strong><span>Consulta de l’arbre i de PAGEWEB01. No assigna ni modifica res.</span></div>
-      <button id="closeAssignPages" type="button">Tancar</button>
-    </div>
-    <div class="create-page-body">
-      <form id="assignPagesForm" class="create-page-form">
-        <input id="assignPagesNodeId" type="text" placeholder="ID exacte del node (p. ex. LIB-4CBC18B682B9)" autocomplete="off" aria-label="ID del node per consultar" required>
-        <button id="lookupAssignNode" class="primary" type="submit">Consultar ID</button>
-      </form>
-      <div id="assignPagesResults" class="create-page-results" aria-live="polite">
-        <p class="muted">Introdueix l’ID del node i consulta’n el nom i la ruta de pàgina candidata.</p>
-      </div>
-      <p class="note">Aquesta primera funció és només de lectura: no canvia articles, assignacions, enllaços, fitxers de GitHub ni cap deployment de Vercel.</p>
-    </div>
-  </div>
-</div>
-<script>
-(function(){
-  'use strict';
-  var OWNER='amargalefv-stack';
-  var REPO='tradeverse-project-master';
-  var TREE_BRANCH='TREEWEB01';
-  var PAGE_BRANCH='PAGEWEB01';
-  var TREE_PATH='TREEWEB.csv';
-  function el(id){return document.getElementById(id)}
-  function escAssign(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-  function decodeBase64Utf8(value){return decodeURIComponent(escape(atob(String(value||'').replace(/\s/g,''))))}
-  function csvRows(text){
-    text=String(text||'').replace(/^\uFEFF/,'');
-    var rows=[],row=[],field='',quoted=false;
-    for(var i=0;i<text.length;i++){
-      var ch=text[i];
-      if(quoted){
-        if(ch==='"'){if(text[i+1]==='"'){field+='"';i++}else quoted=false}
-        else field+=ch;
-      }else if(ch==='"')quoted=true;
-      else if(ch===','){row.push(field);field=''}
-      else if(ch==='\n'){row.push(field);if(row.some(function(x){return String(x).trim()!==''}))rows.push(row);row=[];field=''}
-      else if(ch!=='\r')field+=ch;
-    }
-    row.push(field);if(row.some(function(x){return String(x).trim()!==''}))rows.push(row);
-    if(!rows.length)throw new Error('El CSV de l’arbre és buit.');
-    var headers=rows.shift().map(function(x){return String(x).trim()});
-    var statuses=['DRAFT','REVIEWED','APPROVED','PUBLISHED','READY','STRUCTURED','IN_REVIEW','ARCHIVED','EXCLUDED'];
-    return rows.map(function(values){
-      var v=values.slice(),marker=-1;
-      if(v.length>headers.length){
-        for(var j=11;j<v.length-2;j++){
-          if(statuses.indexOf(String(v[j]||'').trim().toUpperCase())>=0 &&
-             /^(YES|NO|TRUE|FALSE)$/i.test(String(v[j+1]||'').trim()) &&
-             /^(YES|NO|TRUE|FALSE)$/i.test(String(v[j+2]||'').trim())){marker=j;break}
-        }
-        if(marker>11){var fixed=v.slice(0,10);fixed.push(v.slice(10,marker).join(','));v=fixed.concat(v.slice(marker))}
-      }
-      while(v.length>headers.length&&v[v.length-1]==='')v.pop();
-      if(v.length>headers.length)throw new Error('Hi ha una fila CSV amb camps inesperats. La consulta s’ha aturat per seguretat.');
-      while(v.length<headers.length)v.push('');
-      var item={};headers.forEach(function(h,k){if(h)item[h]=String(v[k]||'').trim()});return item;
-    });
-  }
-  async function githubGet(path,ref,token){
-    var url='https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+path;
-    if(ref)url+='?ref='+encodeURIComponent(ref);
-    var response=await fetch(url,{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'},cache:'no-store'});
-    var data={};try{data=await response.json()}catch(ignore){}
-    if(!response.ok)throw new Error('GitHub ha retornat HTTP '+response.status+' en llegir '+path+': '+String(data.message||'error desconegut'));
-    return data;
-  }
-  async function loadTreeRows(token){
-    var contentPath='contents/'+TREE_PATH.split('/').map(encodeURIComponent).join('/');
-    var file=await githubGet(contentPath,TREE_BRANCH,token);
-    var content='';
-    if(file&&file.content&&file.encoding==='base64')content=decodeBase64Utf8(file.content);
-    else if(file&&typeof file.content==='string'&&file.content.trim())content=file.content;
-    if(!content.trim()){
-      var tree=await githubGet('git/trees/'+encodeURIComponent(TREE_BRANCH)+'?recursive=1',null,token);
-      if(tree.truncated)throw new Error('GitHub ha truncat l’índex de TREEWEB01; no és segur fer la consulta.');
-      var entry=(tree.tree||[]).find(function(f){return f.path===TREE_PATH&&f.type==='blob'});
-      if(!entry)throw new Error('No s’ha trobat '+TREE_PATH+' a '+TREE_BRANCH+'.');
-      var blob=await githubGet('git/blobs/'+entry.sha,null,token);
-      if(blob.encoding!=='base64'||!blob.content)throw new Error('No s’ha pogut llegir el CSV canònic de l’arbre.');
-      content=decodeBase64Utf8(blob.content);
-    }
-    var rows=csvRows(content);
-    if(!rows.length||!Object.prototype.hasOwnProperty.call(rows[0],'node_id')||!Object.prototype.hasOwnProperty.call(rows[0],'parent_id'))
-      throw new Error('El CSV no conté les columnes esperades node_id i parent_id.');
-    return rows;
-  }
-  function canonicalDisplayTitle(node){
-    var title=String(node.web_title||'').trim();
-    var fallback=String(node.title||node.node_id||'').trim();
-    if(!title||/^(yes|no|draft|published|ready|true|false)$/i.test(title))return fallback;
-    return title;
-  }
-  function pageSlug(node){
-    var raw=String(node.title||node.node_id||'');
-    var slug=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-    if(!slug)throw new Error('No es pot derivar un nom de pàgina vàlid d’aquest node.');
-    var declared=String(node.web_slug||'').trim().toLowerCase();
-    if(declared&&!/^(yes|no|draft|published|ready|true|false)$/i.test(declared)&&declared!==slug)
-      throw new Error('El web_slug declarat («'+declared+'») no coincideix amb el nom derivat («'+slug+'»). S’ha evitat donar una ruta potencialment incorrecta.');
-    return slug;
-  }
-  async function lookupNode(event){
-    event.preventDefault();
-    var token=el('token').value.trim();
-    var id=el('assignPagesNodeId').value.trim();
-    var result=el('assignPagesResults'),button=el('lookupAssignNode');
-    if(!token){result.innerHTML='<p class="error">Primer introdueix el token GitHub a la part superior de l’editor. Aquesta consulta no necessita permisos d’escriptura.</p>';return}
-    if(!id){result.innerHTML='<p class="error">Introdueix un ID de node.</p>';return}
-    button.disabled=true;button.textContent='Consultant…';
-    result.innerHTML='<p class="muted">Llegint l’arbre canònic i comprovant si ja existeix una pàgina a PAGEWEB01…</p>';
-    try{
-      var rows=await loadTreeRows(token);
-      var node=rows.find(function(n){return String(n.node_id||'').trim().toLowerCase()===id.toLowerCase()});
-      if(!node)throw new Error('No s’ha trobat l’ID «'+id+'» a TREEWEB01/TREEWEB.csv.');
-      var name=canonicalDisplayTitle(node);
-      var slug=pageSlug(node);
-      var route='/biblioteca/'+slug;
-      var filePath='web/app/biblioteca/'+slug+'/page.tsx';
-      var pageState='No s’ha pogut verificar l’existència de la pàgina.';
-      var pageSource='No verificat';
-      try{
-        var tree=await githubGet('git/trees/'+encodeURIComponent(PAGE_BRANCH)+'?recursive=1',null,token);
-        if(tree.truncated)throw new Error('Índex de PAGEWEB01 truncat.');
-        var matches=(tree.tree||[]).filter(function(f){return f.type==='blob'&&(
-          f.path===filePath ||
-          f.path==='web/app/biblioteca/'+slug+'/page.jsx' ||
-          f.path==='web/app/biblioteca/'+slug+'/page.js' ||
-          f.path==='web/app/biblioteca/'+slug+'/page.ts'
-        )});
-        pageState=matches.length?'La pàgina ja existeix a PAGEWEB01':'No s’ha detectat una pàgina amb aquesta ruta a PAGEWEB01';
-        pageSource=matches.length?matches[0].path:filePath;
-      }catch(pageErr){pageState='No verificat: '+String(pageErr.message||pageErr)}
-      result.innerHTML=
-        '<section class="panel" style="border-radius:9px;margin-top:10px"><div class="item"><div class="muted">ID del node</div><strong>'+escAssign(node.node_id)+'</strong></div>'+
-        '<div class="item"><div class="muted">Nom del node (títol canònic)</div><strong>'+escAssign(node.title||'(sense títol)')+'</strong></div>'+
-        '<div class="item"><div class="muted">Nom de pàgina candidat</div><strong>'+escAssign(name||'(sense nom)')+'</strong></div>'+
-        '<div class="item"><div class="muted">Ruta candidata</div><strong>'+escAssign(route)+'</strong></div>'+
-        '<div class="item"><div class="muted">Fitxer i estat a PAGEWEB01</div><strong>'+escAssign(pageState)+'</strong><div class="muted">'+escAssign(pageSource)+'</div></div></section>'+
-        '<p class="note">Consulta completada només amb lectures de GitHub. No s’ha fet cap assignació, commit, canvi d’enllaç ni publicació.</p>';
-    }catch(error){
-      result.innerHTML='<p class="error">'+escAssign(String(error.message||error))+'</p><p class="muted">No s’ha modificat cap fitxer ni configuració.</p>';
-    }finally{button.disabled=false;button.textContent='Consultar ID'}
-  }
-  el('openAssignPages').addEventListener('click',function(){
-    el('assignPagesNodeId').value='';
-    el('assignPagesResults').innerHTML='<p class="muted">Introdueix l’ID del node i prem «Consultar ID».</p>';
-    el('assignPagesModal').classList.remove('hidden');
-    el('assignPagesNodeId').focus();
-  });
-  el('closeAssignPages').addEventListener('click',function(){el('assignPagesModal').classList.add('hidden')});
-  el('assignPagesModal').addEventListener('click',function(event){if(event.target===el('assignPagesModal'))el('assignPagesModal').classList.add('hidden')});
-  el('assignPagesForm').addEventListener('submit',lookupNode);
-  document.addEventListener('keydown',function(event){if(event.key==='Escape'&&!el('assignPagesModal').classList.contains('hidden'))el('assignPagesModal').classList.add('hidden')});
-})();
-</script>
-</body></html>';
+return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preview fiel</title><style>'+css+'</style></head><body><div id="previewRoot"></div><script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js">'+closeTag+'<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom-server-legacy.browser.production.min.js">'+closeTag+'<script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js">'+closeTag+'<script>'+boot+closeTag+'</body></html>';
 }
 
 window.previewLocalPage=async function(path,sourcePath,button){var token=byId('token').value.trim();if(!token){alert('Primer connecta l’editor amb el token de GitHub.');return}var old=button.textContent;button.disabled=true;button.textContent='Preparant…';var modal=byId('localPreviewModal'),frame=byId('localPreviewFrame'),status=byId('localPreviewStatus');byId('localPreviewTitle').textContent='Preview local · '+path;status.textContent='Llegint PAGEWEB01 i renderitzant al navegador…';modal.classList.remove('hidden');frame.srcdoc='<!doctype html><html lang="ca"><body style="font:14px system-ui;padding:24px">Carregant Preview local…</body></html>';try{var a=await getLocalPreviewAssets(token),src=await getPreviewText(sourcePath,token);if(path==='/'&&sourcePath==='web/app/page.tsx'){frame.srcdoc=await renderActualLanding(src,token);status.textContent='Preview de la portada real: componente React i CSS de PAGEWEB01. Sense deploy ni publicació a Vercel.';return}var target=allConfiguredPages(a.config).find(function(x){return x.path===path}),node=findLibraryNode(path,a.library),page,isCreatedLibraryPage=!target&&sourcePath.indexOf('web/app/biblioteca/')===0&&sourcePath.indexOf('/[slug]/')<0&&/\/page\.tsx$/.test(sourcePath)&&(src.indexOf('PageCanvas')>=0||(/const\s+articleMarkdown\s*=/.test(src)&&/const\s+page\s*:\s*EditablePage\s*=/.test(src)&&/GeneratedNodePage/.test(src)));if(isCreatedLibraryPage){var createdObject=objectFromPageSource(src);if(!createdObject)throw new Error('No es pot llegir la configuració de la pàgina creada.');page=applyPageSource({id:path.replace(/^\/|\/$/g,'').replace(/\//g,'-')||'home',kind:'article-children',title:path.split('/').filter(Boolean).pop().replace(/[-_]/g,' '),path:path,template:'article-children',template_id:'article-children',background:'#fafbfc',color:'#173246',accent:'#116c70',width:1220,gap:24,columns:4,blocks:[]},src)}else if(node)page=makeLocalLibraryPage(path,node,a);else if(target){page=JSON.parse(JSON.stringify(target));if(src.indexOf('PageCanvas')>=0)page=applyPageSource(page,src)}else{var obj=objectFromPageSource(src);if(src.indexOf('PageCanvas')>=0&&obj)page=applyPageSource({id:path.replace(/^\/|\/$/g,'').replace(/\//g,'-')||'home',kind:'article',title:path==='/'?'Inicio':path.split('/').filter(Boolean).pop().replace(/[-_]/g,' '),path:path,template:'article',template_id:'article',background:'#fafbfc',color:'#173246',accent:'#116c70',width:1100,gap:24,columns:3,blocks:[]},src);else throw new Error('Aquest fitxer no consta al registre de pàgines ni usa PageCanvas amb una estructura compatible. Per evitar una maqueta falsa, no es genera una pàgina aproximada.')}
@@ -457,4 +297,143 @@ byId('refresh').onclick=function(){window.connectEditor()};
 byId('token').value='';
 show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si falla, aquí apareixerà el motiu exacte.',false);
 })();
-</script></body></html>
+</script>
+<div id="assignPagesModal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="assignPagesTitle">
+  <div class="create-page-dialog">
+    <div class="preview-head">
+      <div><strong id="assignPagesTitle">Assignar pàgines · Consulta inicial</strong><span>Consulta de l’arbre i de PAGEWEB01. No assigna ni modifica res.</span></div>
+      <button id="closeAssignPages" type="button">Tancar</button>
+    </div>
+    <div class="create-page-body">
+      <form id="assignPagesForm" class="create-page-form">
+        <input id="assignPagesNodeId" type="text" placeholder="ID exacte del node (p. ex. LIB-4CBC18B682B9)" autocomplete="off" aria-label="ID del node per consultar" required>
+        <button id="lookupAssignNode" class="primary" type="submit">Consultar ID</button>
+      </form>
+      <div id="assignPagesResults" class="create-page-results" aria-live="polite">
+        <p class="muted">Introdueix l’ID del node i consulta’n el nom i la ruta de pàgina candidata.</p>
+      </div>
+      <p class="note">Aquesta primera funció és només de lectura: no canvia articles, assignacions, enllaços, fitxers de GitHub ni cap deployment de Vercel.</p>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  'use strict';
+  var OWNER='amargalefv-stack', REPO='tradeverse-project-master';
+  var TREE_BRANCH='TREEWEB01', PAGE_BRANCH='PAGEWEB01', TREE_PATH='TREEWEB.csv';
+  function el(id){return document.getElementById(id)}
+  function escAssign(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+  function decodeBase64Utf8(value){return decodeURIComponent(escape(atob(String(value||'').replace(/\s/g,''))))}
+  function csvRows(text){
+    text=String(text||'').replace(/^\uFEFF/,'');
+    var rows=[],row=[],field='',quoted=false;
+    for(var i=0;i<text.length;i++){
+      var ch=text[i];
+      if(quoted){if(ch==='"'){if(text[i+1]==='"'){field+='"';i++}else quoted=false}else field+=ch}
+      else if(ch==='"')quoted=true;
+      else if(ch===','){row.push(field);field=''}
+      else if(ch==='\n'){row.push(field);if(row.some(function(x){return String(x).trim()!==''}))rows.push(row);row=[];field=''}
+      else if(ch!=='\r')field+=ch;
+    }
+    row.push(field);if(row.some(function(x){return String(x).trim()!==''}))rows.push(row);
+    if(!rows.length)throw new Error('El CSV de l’arbre és buit.');
+    var headers=rows.shift().map(function(x){return String(x).trim()});
+    var statuses=['DRAFT','REVIEWED','APPROVED','PUBLISHED','READY','STRUCTURED','IN_REVIEW','ARCHIVED','EXCLUDED'];
+    return rows.map(function(values){
+      var v=values.slice(),marker=-1;
+      if(v.length>headers.length){
+        for(var j=11;j<v.length-2;j++){
+          if(statuses.indexOf(String(v[j]||'').trim().toUpperCase())>=0&&/^(YES|NO|TRUE|FALSE)$/i.test(String(v[j+1]||'').trim())&&/^(YES|NO|TRUE|FALSE)$/i.test(String(v[j+2]||'').trim())){marker=j;break}
+        }
+        if(marker>11){var fixed=v.slice(0,10);fixed.push(v.slice(10,marker).join(','));v=fixed.concat(v.slice(marker))}
+      }
+      while(v.length>headers.length&&v[v.length-1]==='')v.pop();
+      if(v.length>headers.length)throw new Error('Hi ha una fila CSV amb camps inesperats; la consulta s’ha aturat per seguretat.');
+      while(v.length<headers.length)v.push('');
+      var item={};headers.forEach(function(h,k){if(h)item[h]=String(v[k]||'').trim()});return item;
+    });
+  }
+  async function githubGet(path,ref,token){
+    var url='https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+path;
+    if(ref)url+='?ref='+encodeURIComponent(ref);
+    var response=await fetch(url,{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'},cache:'no-store'});
+    var data={};try{data=await response.json()}catch(ignore){}
+    if(!response.ok)throw new Error('GitHub ha retornat HTTP '+response.status+' en llegir '+path+': '+String(data.message||'error desconegut'));
+    return data;
+  }
+  async function loadTreeRows(token){
+    var file=await githubGet('contents/'+TREE_PATH.split('/').map(encodeURIComponent).join('/'),TREE_BRANCH,token);
+    var content='';
+    if(file&&file.content&&file.encoding==='base64')content=decodeBase64Utf8(file.content);
+    else if(file&&typeof file.content==='string'&&file.content.trim())content=file.content;
+    if(!content.trim()){
+      var tree=await githubGet('git/trees/'+encodeURIComponent(TREE_BRANCH)+'?recursive=1',null,token);
+      if(tree.truncated)throw new Error('GitHub ha truncat l’índex de TREEWEB01; no és segur fer la consulta.');
+      var entry=(tree.tree||[]).find(function(f){return f.path===TREE_PATH&&f.type==='blob'});
+      if(!entry)throw new Error('No s’ha trobat '+TREE_PATH+' a '+TREE_BRANCH+'.');
+      var blob=await githubGet('git/blobs/'+entry.sha,null,token);
+      if(blob.encoding!=='base64'||!blob.content)throw new Error('No s’ha pogut llegir el CSV canònic de l’arbre.');
+      content=decodeBase64Utf8(blob.content);
+    }
+    var rows=csvRows(content);
+    if(!rows.length||!Object.prototype.hasOwnProperty.call(rows[0],'node_id')||!Object.prototype.hasOwnProperty.call(rows[0],'parent_id'))
+      throw new Error('El CSV no conté les columnes node_id i parent_id esperades.');
+    return rows;
+  }
+  function canonicalDisplayTitle(node){
+    var title=String(node.web_title||'').trim(),fallback=String(node.title||node.node_id||'').trim();
+    if(!title||/^(yes|no|draft|published|ready|true|false)$/i.test(title))return fallback;
+    return title;
+  }
+  function pageSlug(node){
+    var slug=String(node.title||node.node_id||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    if(!slug)throw new Error('No es pot derivar un nom de pàgina vàlid d’aquest node.');
+    var declared=String(node.web_slug||'').trim().toLowerCase();
+    if(declared&&!/^(yes|no|draft|published|ready|true|false)$/i.test(declared)&&declared!==slug)
+      throw new Error('El web_slug declarat («'+declared+'») no coincideix amb el nom derivat («'+slug+'»). S’ha evitat donar una ruta incorrecta.');
+    return slug;
+  }
+  async function lookupNode(event){
+    event.preventDefault();
+    var token=el('token').value.trim(),id=el('assignPagesNodeId').value.trim();
+    var result=el('assignPagesResults'),button=el('lookupAssignNode');
+    if(!token){result.innerHTML='<p class="error">Primer introdueix el token GitHub a la part superior. Aquesta consulta no necessita permisos d’escriptura.</p>';return}
+    if(!id){result.innerHTML='<p class="error">Introdueix un ID de node.</p>';return}
+    button.disabled=true;button.textContent='Consultant…';
+    result.innerHTML='<p class="muted">Llegint l’arbre canònic i comprovant si la pàgina ja existeix a PAGEWEB01…</p>';
+    try{
+      var rows=await loadTreeRows(token);
+      var node=rows.find(function(n){return String(n.node_id||'').trim().toLowerCase()===id.toLowerCase()});
+      if(!node)throw new Error('No s’ha trobat l’ID «'+id+'» a TREEWEB01/TREEWEB.csv.');
+      var name=canonicalDisplayTitle(node),slug=pageSlug(node),route='/biblioteca/'+slug,filePath='web/app/biblioteca/'+slug+'/page.tsx';
+      var pageState='No s’ha pogut verificar l’existència de la pàgina.',pageSource='No verificat';
+      try{
+        var tree=await githubGet('git/trees/'+encodeURIComponent(PAGE_BRANCH)+'?recursive=1',null,token);
+        if(tree.truncated)throw new Error('Índex de PAGEWEB01 truncat.');
+        var matches=(tree.tree||[]).filter(function(f){return f.type==='blob'&&(f.path===filePath||f.path==='web/app/biblioteca/'+slug+'/page.jsx'||f.path==='web/app/biblioteca/'+slug+'/page.js'||f.path==='web/app/biblioteca/'+slug+'/page.ts')});
+        pageState=matches.length?'La pàgina ja existeix a PAGEWEB01':'No s’ha detectat una pàgina amb aquesta ruta a PAGEWEB01';
+        pageSource=matches.length?matches[0].path:filePath;
+      }catch(pageErr){pageState='No verificat: '+String(pageErr.message||pageErr)}
+      result.innerHTML=
+        '<section class="panel" style="border-radius:9px;margin-top:10px"><div class="item"><div class="muted">ID del node</div><strong>'+escAssign(node.node_id)+'</strong></div>'+
+        '<div class="item"><div class="muted">Nom del node (títol canònic)</div><strong>'+escAssign(node.title||'(sense títol)')+'</strong></div>'+
+        '<div class="item"><div class="muted">Nom de pàgina candidat</div><strong>'+escAssign(name||'(sense nom)')+'</strong></div>'+
+        '<div class="item"><div class="muted">Ruta candidata</div><strong>'+escAssign(route)+'</strong></div>'+
+        '<div class="item"><div class="muted">Fitxer i estat a PAGEWEB01</div><strong>'+escAssign(pageState)+'</strong><div class="muted">'+escAssign(pageSource)+'</div></div></section>'+
+        '<p class="note">Consulta completada només amb lectures de GitHub. No s’ha fet cap assignació, commit, canvi d’enllaç ni publicació.</p>';
+    }catch(error){
+      result.innerHTML='<p class="error">'+escAssign(String(error.message||error))+'</p><p class="muted">No s’ha modificat cap fitxer ni configuració.</p>';
+    }finally{button.disabled=false;button.textContent='Consultar ID'}
+  }
+  el('openAssignPages').addEventListener('click',function(){
+    el('assignPagesNodeId').value='';
+    el('assignPagesResults').innerHTML='<p class="muted">Introdueix l’ID del node i prem «Consultar ID».</p>';
+    el('assignPagesModal').classList.remove('hidden');el('assignPagesNodeId').focus();
+  });
+  el('closeAssignPages').addEventListener('click',function(){el('assignPagesModal').classList.add('hidden')});
+  el('assignPagesModal').addEventListener('click',function(event){if(event.target===el('assignPagesModal'))el('assignPagesModal').classList.add('hidden')});
+  el('assignPagesForm').addEventListener('submit',lookupNode);
+  document.addEventListener('keydown',function(event){if(event.key==='Escape'&&!el('assignPagesModal').classList.contains('hidden'))el('assignPagesModal').classList.add('hidden')});
+})();
+</script>
+</body></html>
