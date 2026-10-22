@@ -299,141 +299,117 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
 })();
 </script>
 <div id="assignPagesModal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="assignPagesTitle">
-  <div class="create-page-dialog">
+  <div class="create-page-dialog" style="width:min(1200px,100%);max-height:94vh">
     <div class="preview-head">
-      <div><strong id="assignPagesTitle">Assignar pàgines · Consulta inicial</strong><span>Consulta de l’arbre i de PAGEWEB01. No assigna ni modifica res.</span></div>
+      <div><strong id="assignPagesTitle">Assignar pàgines · Correspondència arbre ↔ pàgines</strong><span>Columna esquerra: nodes complets de TREEWEB01. Columna dreta: pàgines candidates de PAGEWEB01.</span></div>
       <button id="closeAssignPages" type="button">Tancar</button>
     </div>
     <div class="create-page-body">
-      <form id="assignPagesForm" class="create-page-form">
-        <input id="assignPagesNodeId" type="text" placeholder="ID exacte del node (p. ex. LIB-4CBC18B682B9)" autocomplete="off" aria-label="ID del node per consultar" required>
-        <button id="lookupAssignNode" class="primary" type="submit">Consultar ID</button>
-      </form>
-      <div id="assignPagesResults" class="create-page-results" aria-live="polite">
-        <p class="muted">Introdueix l’ID del node i consulta’n el nom i la ruta de pàgina candidata.</p>
+      <div class="bar" style="margin-bottom:12px"><input id="assignSearch" type="search" placeholder="Filtra nodes o pàgines per nom, ID o ruta…"><button id="loadAssignData" class="primary" type="button">Carregar / actualitzar</button></div>
+      <div id="assignPagesStatus" class="note" aria-live="polite">Prem «Carregar / actualitzar» per llegir l’arbre i les pàgines de les branques corresponents.</div>
+      <div class="assign-two-col">
+        <section class="panel"><h2>1. Nodes de TREEWEB01 <span id="assignNodeCount" class="pill">0</span></h2><div id="assignNodeList" class="list" style="max-height:55vh"><div class="empty">Encara no s’han carregat els nodes.</div></div></section>
+        <section class="panel"><h2>2. Possibles pàgines de PAGEWEB01 <span id="assignPageCount" class="pill">0</span></h2><div id="assignCandidateList" class="list" style="max-height:55vh"><div class="empty">Selecciona un node de la primera columna.</div></div></section>
       </div>
-      <p class="note">Aquesta primera funció és només de lectura: no canvia articles, assignacions, enllaços, fitxers de GitHub ni cap deployment de Vercel.</p>
+      <div id="assignSelectionSummary" class="note">Selecciona primer un node i després una possible pàgina per veure la correspondència.</div>
+      <p class="note">Aquesta pantalla carrega dades reals de GitHub. En aquesta fase la selecció és de consulta: no desa assignacions, no modifica articles ni configuració i no publica a Vercel.</p>
     </div>
   </div>
 </div>
+<style>
+.assign-two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.assign-two-col .panel h2{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.assign-row{padding:10px 12px;border-bottom:1px solid #eaf0f3;cursor:pointer;overflow-wrap:anywhere}
+.assign-row:last-child{border-bottom:0}
+.assign-row:hover{background:#f4fafb}
+.assign-row.selected{background:#e6f5f5;outline:2px solid var(--accent);outline-offset:-2px}
+.assign-row strong{display:block;font-size:13px}
+.assign-row .muted{display:block;margin-top:3px}
+.assign-match{display:inline-block;margin-top:5px;padding:2px 6px;border-radius:5px;background:#e5eef2;font-size:11px}
+@media(max-width:760px){.assign-two-col{grid-template-columns:1fr}.assign-two-col .list{max-height:32vh!important}}
+</style>
 <script>
 (function(){
   'use strict';
   var OWNER='amargalefv-stack', REPO='tradeverse-project-master';
   var TREE_BRANCH='TREEWEB01', PAGE_BRANCH='PAGEWEB01', TREE_PATH='TREEWEB.csv';
+  var nodes=[], pages=[], selectedNodeId='', selectedCandidatePath='';
   function el(id){return document.getElementById(id)}
-  function escAssign(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-  function decodeBase64Utf8(value){return decodeURIComponent(escape(atob(String(value||'').replace(/\s/g,''))))}
-  function csvRows(text){
-    text=String(text||'').replace(/^\uFEFF/,'');
-    var rows=[],row=[],field='',quoted=false;
-    for(var i=0;i<text.length;i++){
-      var ch=text[i];
-      if(quoted){if(ch==='"'){if(text[i+1]==='"'){field+='"';i++}else quoted=false}else field+=ch}
-      else if(ch==='"')quoted=true;
-      else if(ch===','){row.push(field);field=''}
-      else if(ch==='\n'){row.push(field);if(row.some(function(x){return String(x).trim()!==''}))rows.push(row);row=[];field=''}
-      else if(ch!=='\r')field+=ch;
-    }
-    row.push(field);if(row.some(function(x){return String(x).trim()!==''}))rows.push(row);
-    if(!rows.length)throw new Error('El CSV de l’arbre és buit.');
-    var headers=rows.shift().map(function(x){return String(x).trim()});
-    var statuses=['DRAFT','REVIEWED','APPROVED','PUBLISHED','READY','STRUCTURED','IN_REVIEW','ARCHIVED','EXCLUDED'];
-    return rows.map(function(values){
-      var v=values.slice(),marker=-1;
-      if(v.length>headers.length){
-        for(var j=11;j<v.length-2;j++){
-          if(statuses.indexOf(String(v[j]||'').trim().toUpperCase())>=0&&/^(YES|NO|TRUE|FALSE)$/i.test(String(v[j+1]||'').trim())&&/^(YES|NO|TRUE|FALSE)$/i.test(String(v[j+2]||'').trim())){marker=j;break}
-        }
-        if(marker>11){var fixed=v.slice(0,10);fixed.push(v.slice(10,marker).join(','));v=fixed.concat(v.slice(marker))}
-      }
-      while(v.length>headers.length&&v[v.length-1]==='')v.pop();
-      if(v.length>headers.length)throw new Error('Hi ha una fila CSV amb camps inesperats; la consulta s’ha aturat per seguretat.');
-      while(v.length<headers.length)v.push('');
-      var item={};headers.forEach(function(h,k){if(h)item[h]=String(v[k]||'').trim()});return item;
-    });
-  }
-  async function githubGet(path,ref,token){
+  function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+  function decode64(s){return decodeURIComponent(escape(atob(String(s||'').replace(/\s/g,''))))}
+  async function get(path,ref,token){
     var url='https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+path;
     if(ref)url+='?ref='+encodeURIComponent(ref);
-    var response=await fetch(url,{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'},cache:'no-store'});
-    var data={};try{data=await response.json()}catch(ignore){}
-    if(!response.ok)throw new Error('GitHub ha retornat HTTP '+response.status+' en llegir '+path+': '+String(data.message||'error desconegut'));
-    return data;
+    var r=await fetch(url,{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'},cache:'no-store'});
+    var d={};try{d=await r.json()}catch(e){}
+    if(!r.ok)throw new Error('GitHub HTTP '+r.status+' en llegir '+path+': '+(d.message||'error'));
+    return d;
   }
-  async function loadTreeRows(token){
-    var file=await githubGet('contents/'+TREE_PATH.split('/').map(encodeURIComponent).join('/'),TREE_BRANCH,token);
-    var content='';
-    if(file&&file.content&&file.encoding==='base64')content=decodeBase64Utf8(file.content);
-    else if(file&&typeof file.content==='string'&&file.content.trim())content=file.content;
-    if(!content.trim()){
-      var tree=await githubGet('git/trees/'+encodeURIComponent(TREE_BRANCH)+'?recursive=1',null,token);
-      if(tree.truncated)throw new Error('GitHub ha truncat l’índex de TREEWEB01; no és segur fer la consulta.');
-      var entry=(tree.tree||[]).find(function(f){return f.path===TREE_PATH&&f.type==='blob'});
-      if(!entry)throw new Error('No s’ha trobat '+TREE_PATH+' a '+TREE_BRANCH+'.');
-      var blob=await githubGet('git/blobs/'+entry.sha,null,token);
-      if(blob.encoding!=='base64'||!blob.content)throw new Error('No s’ha pogut llegir el CSV canònic de l’arbre.');
-      content=decodeBase64Utf8(blob.content);
-    }
-    var rows=csvRows(content);
-    if(!rows.length||!Object.prototype.hasOwnProperty.call(rows[0],'node_id')||!Object.prototype.hasOwnProperty.call(rows[0],'parent_id'))
-      throw new Error('El CSV no conté les columnes node_id i parent_id esperades.');
-    return rows;
+  function parseCsv(text){
+    text=String(text||'').replace(/^\uFEFF/,'');var rows=[],row=[],field='',quoted=false;
+    for(var i=0;i<text.length;i++){var ch=text[i];if(quoted){if(ch==='"'){if(text[i+1]==='"'){field+='"';i++}else quoted=false}else field+=ch}else if(ch==='"')quoted=true;else if(ch===','){row.push(field);field=''}else if(ch==='\n'){row.push(field);if(row.some(function(x){return String(x).trim()}))rows.push(row);row=[];field=''}else if(ch!=='\r')field+=ch}
+    row.push(field);if(row.some(function(x){return String(x).trim()}))rows.push(row);
+    if(!rows.length)throw new Error('El CSV de TREEWEB01 és buit.');
+    var headers=rows.shift().map(function(x){return String(x).trim()});
+    return rows.map(function(values){var o={};headers.forEach(function(h,i){if(h)o[h]=String(values[i]||'').trim()});return o}).filter(function(n){return n.node_id});
   }
-  function canonicalDisplayTitle(node){
-    var title=String(node.web_title||'').trim(),fallback=String(node.title||node.node_id||'').trim();
-    if(!title||/^(yes|no|draft|published|ready|true|false)$/i.test(title))return fallback;
-    return title;
+  function nodeName(n){var t=String(n.web_title||'').trim();return t&&!/^(yes|no|draft|published|ready|true|false)$/i.test(t)?t:(n.title||n.name||n.node_id)}
+  function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
+  function pageTitle(path){var s=path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');return (s.split('/').pop()||'Inici').replace(/[-_]/g,' ')}
+  function score(n,p){
+    var name=slug(n.title||nodeName(n)), web=slug(n.web_title||''), nodeSlug=slug(n.web_slug||'');
+    var route=slug(p.path.split('/').filter(Boolean).pop()||'inici'), title=slug(p.title);
+    if(nodeSlug&&(route===nodeSlug||title===nodeSlug))return 100;
+    if(name&&(route===name||title===name))return 95;
+    if(web&&(route===web||title===web))return 92;
+    if(name&&(route.indexOf(name)>=0||name.indexOf(route)>=0))return 70;
+    if(web&&(route.indexOf(web)>=0||web.indexOf(route)>=0))return 65;
+    var a=(name||'').split('-').filter(function(x){return x.length>2}),b=(route+'-'+title).split('-');
+    var hits=a.filter(function(x){return b.indexOf(x)>=0}).length;
+    return a.length?Math.round(40*hits/a.length):0;
   }
-  function pageSlug(node){
-    var slug=String(node.title||node.node_id||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-    if(!slug)throw new Error('No es pot derivar un nom de pàgina vàlid d’aquest node.');
-    var declared=String(node.web_slug||'').trim().toLowerCase();
-    if(declared&&!/^(yes|no|draft|published|ready|true|false)$/i.test(declared)&&declared!==slug)
-      throw new Error('El web_slug declarat («'+declared+'») no coincideix amb el nom derivat («'+slug+'»). S’ha evitat donar una ruta incorrecta.');
-    return slug;
+  function renderNodes(){
+    var q=el('assignSearch').value.trim().toLowerCase();
+    var list=nodes.filter(function(n){return (n.node_id+' '+nodeName(n)+' '+(n.title||'')+' '+(n.parent_id||'')).toLowerCase().indexOf(q)>=0});
+    el('assignNodeCount').textContent=String(nodes.length);
+    el('assignNodeList').innerHTML=list.length?list.map(function(n){var active=n.node_id===selectedNodeId;return '<div tabindex="0" role="button" class="assign-row '+(active?'selected':'')+'" data-node-id="'+esc(n.node_id)+'"><strong>'+esc(n.title||nodeName(n))+'</strong><span class="muted">'+esc(n.node_id)+(n.parent_id?' · Pare: '+esc(n.parent_id):'')+'</span></div>'}).join(''):'<div class="empty">No hi ha nodes que coincideixin amb el filtre.</div>';
   }
-  async function lookupNode(event){
-    event.preventDefault();
-    var token=el('token').value.trim(),id=el('assignPagesNodeId').value.trim();
-    var result=el('assignPagesResults'),button=el('lookupAssignNode');
-    if(!token){result.innerHTML='<p class="error">Primer introdueix el token GitHub a la part superior. Aquesta consulta no necessita permisos d’escriptura.</p>';return}
-    if(!id){result.innerHTML='<p class="error">Introdueix un ID de node.</p>';return}
-    button.disabled=true;button.textContent='Consultant…';
-    result.innerHTML='<p class="muted">Llegint l’arbre canònic i comprovant si la pàgina ja existeix a PAGEWEB01…</p>';
+  function renderCandidates(){
+    var q=el('assignSearch').value.trim().toLowerCase(),n=nodes.find(function(x){return x.node_id===selectedNodeId});
+    el('assignPageCount').textContent=String(pages.length);
+    if(!n){el('assignCandidateList').innerHTML='<div class="empty">Selecciona un node de la primera columna.</div>';el('assignSelectionSummary').textContent='Selecciona primer un node i després una possible pàgina.';return}
+    var ranked=pages.map(function(p){return {p:p,s:score(n,p)}}).sort(function(a,b){return b.s-a.s||a.p.path.localeCompare(b.p.path)});
+    var filtered=ranked.filter(function(x){return (x.p.title+' '+x.p.path+' '+x.p.source).toLowerCase().indexOf(q)>=0||String(n.node_id+' '+nodeName(n)).toLowerCase().indexOf(q)>=0});
+    el('assignCandidateList').innerHTML=filtered.length?filtered.map(function(x){var p=x.p,active=p.path===selectedCandidatePath;return '<div tabindex="0" role="button" class="assign-row '+(active?'selected':'')+'" data-candidate-path="'+esc(p.path)+'"><strong>'+esc(p.title)+'</strong><span class="muted">'+esc(p.path)+'</span><span class="muted">'+esc(p.source)+'</span><span class="assign-match">'+(x.s>=90?'Coincidència alta':x.s>=60?'Possible coincidència':x.s>0?'Coincidència parcial':'Sense coincidència clara')+'</span></div>'}).join(''):'<div class="empty">No hi ha pàgines candidates per al filtre actual.</div>';
+    var chosen=pages.find(function(p){return p.path===selectedCandidatePath});
+    el('assignSelectionSummary').innerHTML='<strong>Node:</strong> '+esc(nodeName(n))+' ('+esc(n.node_id)+')'+(chosen?' &nbsp; <strong>Pàgina seleccionada:</strong> '+esc(chosen.title)+' · '+esc(chosen.path):' &nbsp; Selecciona una pàgina de la columna dreta.');
+  }
+  async function load(){
+    var token=el('token').value.trim();if(!token){el('assignPagesStatus').innerHTML='<span class="error">Introdueix primer el token GitHub a la part superior i torna a carregar.</span>';return}
+    var btn=el('loadAssignData');btn.disabled=true;btn.textContent='Carregant…';el('assignPagesStatus').textContent='Llegint TREEWEB01 i PAGEWEB01 des de GitHub…';
     try{
-      var rows=await loadTreeRows(token);
-      var node=rows.find(function(n){return String(n.node_id||'').trim().toLowerCase()===id.toLowerCase()});
-      if(!node)throw new Error('No s’ha trobat l’ID «'+id+'» a TREEWEB01/TREEWEB.csv.');
-      var name=canonicalDisplayTitle(node),slug=pageSlug(node),route='/biblioteca/'+slug,filePath='web/app/biblioteca/'+slug+'/page.tsx';
-      var pageState='No s’ha pogut verificar l’existència de la pàgina.',pageSource='No verificat';
-      try{
-        var tree=await githubGet('git/trees/'+encodeURIComponent(PAGE_BRANCH)+'?recursive=1',null,token);
-        if(tree.truncated)throw new Error('Índex de PAGEWEB01 truncat.');
-        var matches=(tree.tree||[]).filter(function(f){return f.type==='blob'&&(f.path===filePath||f.path==='web/app/biblioteca/'+slug+'/page.jsx'||f.path==='web/app/biblioteca/'+slug+'/page.js'||f.path==='web/app/biblioteca/'+slug+'/page.ts')});
-        pageState=matches.length?'La pàgina ja existeix a PAGEWEB01':'No s’ha detectat una pàgina amb aquesta ruta a PAGEWEB01';
-        pageSource=matches.length?matches[0].path:filePath;
-      }catch(pageErr){pageState='No verificat: '+String(pageErr.message||pageErr)}
-      result.innerHTML=
-        '<section class="panel" style="border-radius:9px;margin-top:10px"><div class="item"><div class="muted">ID del node</div><strong>'+escAssign(node.node_id)+'</strong></div>'+
-        '<div class="item"><div class="muted">Nom del node (títol canònic)</div><strong>'+escAssign(node.title||'(sense títol)')+'</strong></div>'+
-        '<div class="item"><div class="muted">Nom de pàgina candidat</div><strong>'+escAssign(name||'(sense nom)')+'</strong></div>'+
-        '<div class="item"><div class="muted">Ruta candidata</div><strong>'+escAssign(route)+'</strong></div>'+
-        '<div class="item"><div class="muted">Fitxer i estat a PAGEWEB01</div><strong>'+escAssign(pageState)+'</strong><div class="muted">'+escAssign(pageSource)+'</div></div></section>'+
-        '<p class="note">Consulta completada només amb lectures de GitHub. No s’ha fet cap assignació, commit, canvi d’enllaç ni publicació.</p>';
-    }catch(error){
-      result.innerHTML='<p class="error">'+escAssign(String(error.message||error))+'</p><p class="muted">No s’ha modificat cap fitxer ni configuració.</p>';
-    }finally{button.disabled=false;button.textContent='Consultar ID'}
+      var raw=await get('contents/'+TREE_PATH.split('/').map(encodeURIComponent).join('/'),TREE_BRANCH,token);
+      var csv=raw.content&&raw.encoding==='base64'?decode64(raw.content):String(raw.content||'');
+      if(!csv.trim())throw new Error('No s’ha pogut llegir el contingut de '+TREE_PATH+' a '+TREE_BRANCH+'.');
+      nodes=parseCsv(csv);
+      var tree=await get('git/trees/'+encodeURIComponent(PAGE_BRANCH)+'?recursive=1',null,token);
+      if(tree.truncated)throw new Error('GitHub ha truncat la llista de fitxers de PAGEWEB01; no es mostren resultats incomplets.');
+      pages=(tree.tree||[]).filter(function(f){return f.type==='blob'&&/^web\/app\/.+\.(tsx|jsx|ts|js)$/.test(f.path)&&(/\/page\.(tsx|jsx|ts|js)$/.test(f.path)||f.path==='web/app/page.tsx')}).map(function(f){var s=f.path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');var route=f.path==='web/app/page.tsx'?'/':'/'+s;if(s.indexOf('(')===0||s.indexOf('api/')===0||s.indexOf('/api/')>=0)return null;return {path:route,source:f.path,sha:f.sha,title:pageTitle(f.path)}}).filter(Boolean).filter(function(p,i,a){return a.findIndex(function(x){return x.path===p.path})===i}).sort(function(a,b){return a.path.localeCompare(b.path)});
+      selectedNodeId='';selectedCandidatePath='';renderNodes();renderCandidates();
+      el('assignPagesStatus').textContent='Carregat correctament: '+nodes.length+' nodes de TREEWEB01 i '+pages.length+' pàgines candidates de PAGEWEB01. La selecció no desa cap canvi.';
+    }catch(e){el('assignPagesStatus').innerHTML='<span class="error">'+esc(e.message||e)+'</span>'}
+    finally{btn.disabled=false;btn.textContent='Carregar / actualitzar'}
   }
-  el('openAssignPages').addEventListener('click',function(){
-    el('assignPagesNodeId').value='';
-    el('assignPagesResults').innerHTML='<p class="muted">Introdueix l’ID del node i prem «Consultar ID».</p>';
-    el('assignPagesModal').classList.remove('hidden');el('assignPagesNodeId').focus();
-  });
+  el('openAssignPages').addEventListener('click',function(){el('assignPagesModal').classList.remove('hidden');if(!nodes.length)load()});
   el('closeAssignPages').addEventListener('click',function(){el('assignPagesModal').classList.add('hidden')});
-  el('assignPagesModal').addEventListener('click',function(event){if(event.target===el('assignPagesModal'))el('assignPagesModal').classList.add('hidden')});
-  el('assignPagesForm').addEventListener('submit',lookupNode);
-  document.addEventListener('keydown',function(event){if(event.key==='Escape'&&!el('assignPagesModal').classList.contains('hidden'))el('assignPagesModal').classList.add('hidden')});
+  el('assignPagesModal').addEventListener('click',function(e){if(e.target===el('assignPagesModal'))el('assignPagesModal').classList.add('hidden')});
+  el('loadAssignData').addEventListener('click',load);
+  el('assignSearch').addEventListener('input',function(){renderNodes();renderCandidates()});
+  el('assignNodeList').addEventListener('click',function(e){var r=e.target.closest('[data-node-id]');if(r){selectedNodeId=r.getAttribute('data-node-id');selectedCandidatePath='';renderNodes();renderCandidates()}});
+  el('assignNodeList').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){var r=e.target.closest('[data-node-id]');if(r){e.preventDefault();selectedNodeId=r.getAttribute('data-node-id');selectedCandidatePath='';renderNodes();renderCandidates()}}});
+  el('assignCandidateList').addEventListener('click',function(e){var r=e.target.closest('[data-candidate-path]');if(r){selectedCandidatePath=r.getAttribute('data-candidate-path');renderCandidates()}});
+  el('assignCandidateList').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){var r=e.target.closest('[data-candidate-path]');if(r){e.preventDefault();selectedCandidatePath=r.getAttribute('data-candidate-path');renderCandidates()}}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!el('assignPagesModal').classList.contains('hidden'))el('assignPagesModal').classList.add('hidden')});
 })();
 </script>
 </body></html>
