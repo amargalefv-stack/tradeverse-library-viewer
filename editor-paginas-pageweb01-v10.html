@@ -356,11 +356,11 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
   function nodeName(n){var t=String(n.web_title||'').trim();return t&&!/^(yes|no|draft|published|ready|true|false)$/i.test(t)?t:(n.title||n.name||n.node_id)}
   function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
   function pageTitle(path){var s=path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');return (s.split('/').pop()||'Inici').replace(/[-_]/g,' ')}
-  function normalizeRoute(route){var s=String(route||'').split(/[?#]/)[0].trim();if(/^https?:\\/\\//i.test(s)){try{s=new URL(s).pathname}catch(e){return ''}}if(s.charAt(0)!=='/')return '';s=s.replace(/\\/+$/,'');return s||'/'}
+  function normalizeRoute(route){var s=String(route||'').split(/[?#]/)[0].trim();if(/^https?:\/\//i.test(s)){try{s=new URL(s).pathname}catch(e){return ''}}if(s.charAt(0)!=='/')return '';s=s.replace(/\/+$/,'');return s||'/'} 
   function parseCardLinks(sourcePage,sourceText){
-    var out=[],objects=String(sourceText||'').match(/\\{[^{}]*\\}/g)||[];
+    var out=[],objects=String(sourceText||'').match(/\{[^{}]*\}/g)||[];
     objects.forEach(function(obj){
-      var titleMatch=obj.match(/\\btitle\\s*:\\s*(['"])(.*?)\\1/),hrefMatch=obj.match(/\\bhref\\s*:\\s*(['"])(\\/[^'"]*)\\1/),nodeMatch=obj.match(/\\bnode_id\\s*:\\s*(['"])([^'"]+)\\1/);
+      var titleMatch=obj.match(/\btitle\s*:\s*(['"])(.*?)\1/),hrefMatch=obj.match(/\bhref\s*:\s*(['"])(\/[^'"]*)\1/),nodeMatch=obj.match(/\bnode_id\s*:\s*(['"])([^'"]+)\1/);
       if(!titleMatch||!hrefMatch)return;
       var href=normalizeRoute(hrefMatch[2]);if(!href)return;
       out.push({title:titleMatch[2].trim(),href:href,nodeId:nodeMatch?nodeMatch[2].trim():'',source:sourcePage.source,sourcePath:sourcePage.path});
