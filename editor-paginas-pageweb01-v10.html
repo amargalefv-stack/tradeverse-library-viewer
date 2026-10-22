@@ -325,7 +325,7 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
 .assign-row.selected{background:#e6f5f5;outline:2px solid var(--accent);outline-offset:-2px}
 .assign-row strong{display:block;font-size:13px}
 .assign-row .muted{display:block;margin-top:3px}
-.assign-match{display:inline-block;margin-top:5px;padding:2px 6px;border-radius:5px;background:#e5eef2;font-size:11px}
+.assign-match{display:inline-block;margin-top:5px;padding:2px 6px;border-radius:5px;background:#e5eef2;font-size:11px}\n.assign-detection{padding:12px;border-bottom:1px solid var(--line);background:#f8fbfc}.assign-detection>strong{display:block;margin-bottom:5px}.assign-detection>.muted{display:block;margin-bottom:7px}.assign-found{background:#f6fafb}.assign-suggestion-heading{padding:11px 12px;font-weight:700;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:#f8fbfc}
 @media(max-width:760px){.assign-two-col{grid-template-columns:1fr}.assign-two-col .list{max-height:32vh!important}}
 </style>
 <script>
@@ -333,7 +333,7 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
   'use strict';
   var OWNER='amargalefv-stack', REPO='tradeverse-project-master';
   var TREE_BRANCH='TREEWEB01', PAGE_BRANCH='PAGEWEB01', TREE_PATH='TREEWEB.csv';
-  var nodes=[], pages=[], selectedNodeId='', selectedCandidatePath='';
+  var nodes=[], pages=[], cardLinks=[], cardScanErrors=[], cardScanCount=0, selectedNodeId='', selectedCandidatePath='';
   function el(id){return document.getElementById(id)}
   function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
   function decode64(s){return decodeURIComponent(escape(atob(String(s||'').replace(/\s/g,''))))}
@@ -356,6 +356,40 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
   function nodeName(n){var t=String(n.web_title||'').trim();return t&&!/^(yes|no|draft|published|ready|true|false)$/i.test(t)?t:(n.title||n.name||n.node_id)}
   function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
   function pageTitle(path){var s=path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');return (s.split('/').pop()||'Inici').replace(/[-_]/g,' ')}
+  function normalizeRoute(route){var s=String(route||'').split(/[?#]/)[0].trim();if(/^https?:\\/\\//i.test(s)){try{s=new URL(s).pathname}catch(e){return ''}}if(s.charAt(0)!=='/')return '';s=s.replace(/\\/+$/,'');return s||'/'}
+  function parseCardLinks(sourcePage,sourceText){
+    var out=[],objects=String(sourceText||'').match(/\\{[^{}]*\\}/g)||[];
+    objects.forEach(function(obj){
+      var titleMatch=obj.match(/\\btitle\\s*:\\s*(['"])(.*?)\\1/),hrefMatch=obj.match(/\\bhref\\s*:\\s*(['"])(\\/[^'"]*)\\1/),nodeMatch=obj.match(/\\bnode_id\\s*:\\s*(['"])([^'"]+)\\1/);
+      if(!titleMatch||!hrefMatch)return;
+      var href=normalizeRoute(hrefMatch[2]);if(!href)return;
+      out.push({title:titleMatch[2].trim(),href:href,nodeId:nodeMatch?nodeMatch[2].trim():'',source:sourcePage.source,sourcePath:sourcePage.path});
+    });
+    return out;
+  }
+  async function scanCardLinks(token){
+    cardLinks=[];cardScanErrors=[];cardScanCount=0;
+    var batchSize=6;
+    for(var offset=0;offset<pages.length;offset+=batchSize){
+      var batch=pages.slice(offset,offset+batchSize);
+      await Promise.all(batch.map(async function(p){
+        try{
+          var meta=await get('contents/'+p.source.split('/').map(encodeURIComponent).join('/'),PAGE_BRANCH,token);
+          var sourceText=meta.content&&meta.encoding==='base64'?decode64(meta.content):String(meta.content||'');
+          if(!sourceText)throw new Error('fitxer sense contingut llegible');
+          cardLinks=cardLinks.concat(parseCardLinks(p,sourceText));cardScanCount++;
+        }catch(err){cardScanErrors.push(p.source+': '+String(err.message||err))}
+      }));
+    }
+  }
+  function cardsForNode(n){
+    var keys=[n.title,nodeName(n),n.web_title,n.web_slug].map(function(v){return slug(v)}).filter(Boolean);
+    return cardLinks.filter(function(c){return (c.nodeId&&c.nodeId===n.node_id)||keys.indexOf(slug(c.title))>=0});
+  }
+  function associatedTargetPath(n){
+    var paths=cardsForNode(n).map(function(c){var target=pages.find(function(p){return normalizeRoute(p.path)===normalizeRoute(c.href)});return target?target.path:''}).filter(Boolean);
+    var unique=paths.filter(function(p,i,a){return a.indexOf(p)===i});return unique.length===1?unique[0]:'';
+  }
   function score(n,p){
     var name=slug(n.title||nodeName(n)), web=slug(n.web_title||''), nodeSlug=slug(n.web_slug||'');
     var route=slug(p.path.split('/').filter(Boolean).pop()||'inici'), title=slug(p.title);
@@ -378,11 +412,24 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
     var q=el('assignSearch').value.trim().toLowerCase(),n=nodes.find(function(x){return x.node_id===selectedNodeId});
     el('assignPageCount').textContent=String(pages.length);
     if(!n){el('assignCandidateList').innerHTML='<div class="empty">Selecciona un node de la primera columna.</div>';el('assignSelectionSummary').textContent='Selecciona primer un node i després una possible pàgina.';return}
+    var matches=cardsForNode(n),resolvedPaths=[],detection='';
+    if(matches.length){
+      detection='<div class="assign-detection"><strong>Correspondència trobada a una targeta real</strong><span class="muted">S’ha buscat pel títol/ID de la targeta i s’ha verificat el seu href contra les pàgines existents de PAGEWEB01.</span>';
+      matches.forEach(function(c){
+        var target=pages.find(function(p){return normalizeRoute(p.path)===normalizeRoute(c.href)});
+        if(target){resolvedPaths.push(target.path);detection+='<div tabindex="0" role="button" class="assign-row assign-found '+(selectedCandidatePath===target.path?'selected':'')+'" data-candidate-path="'+esc(target.path)+'"><strong>Targeta: '+esc(c.title)+' → pàgina destí trobada</strong><span class="muted">Pàgina origen: '+esc(c.sourcePath)+' · href real: '+esc(c.href)+'</span><span class="muted">Ruta confirmada: '+esc(target.path)+'</span><span class="muted">Fitxer destí: '+esc(target.source)+'</span></div>'}
+        else{detection+='<div class="assign-row assign-found"><strong>Targeta: '+esc(c.title)+'</strong><span class="muted">Pàgina origen: '+esc(c.sourcePath)+' · href real: '+esc(c.href)+'</span><span class="warn">La targeta existeix, però la ruta no s’ha trobat entre les pàgines carregades de PAGEWEB01.</span></div>'}
+      });
+      detection+='</div>';
+    }else if(cardScanErrors.length){detection='<div class="assign-detection"><strong>No es pot confirmar la correspondència</strong><span class="muted">La lectura de '+cardScanErrors.length+' fitxer(s) de pàgina ha fallat. Els resultats de targetes poden ser incomplets.</span></div>'}
+    else{detection='<div class="assign-detection"><strong>No s’ha trobat cap targeta associada exactament a aquest node.</strong><span class="muted">A continuació es mostren possibles pàgines per similitud de nom o ruta; no es consideren correspondències confirmades.</span></div>'}
     var ranked=pages.map(function(p){return {p:p,s:score(n,p)}}).sort(function(a,b){return b.s-a.s||a.p.path.localeCompare(b.p.path)});
-    var filtered=ranked.filter(function(x){return (x.p.title+' '+x.p.path+' '+x.p.source).toLowerCase().indexOf(q)>=0||String(n.node_id+' '+nodeName(n)).toLowerCase().indexOf(q)>=0});
-    el('assignCandidateList').innerHTML=filtered.length?filtered.map(function(x){var p=x.p,active=p.path===selectedCandidatePath;return '<div tabindex="0" role="button" class="assign-row '+(active?'selected':'')+'" data-candidate-path="'+esc(p.path)+'"><strong>'+esc(p.title)+'</strong><span class="muted">'+esc(p.path)+'</span><span class="muted">'+esc(p.source)+'</span><span class="assign-match">'+(x.s>=90?'Coincidència alta':x.s>=60?'Possible coincidència':x.s>0?'Coincidència parcial':'Sense coincidència clara')+'</span></div>'}).join(''):'<div class="empty">No hi ha pàgines candidates per al filtre actual.</div>';
+    var filtered=ranked.filter(function(x){return resolvedPaths.indexOf(x.p.path)<0&&((x.p.title+' '+x.p.path+' '+x.p.source).toLowerCase().indexOf(q)>=0||String(n.node_id+' '+nodeName(n)).toLowerCase().indexOf(q)>=0)});
+    var suggestions=filtered.length?'<div class="assign-suggestion-heading">Altres pàgines candidates (només per similitud)</div>'+filtered.map(function(x){var p=x.p,active=p.path===selectedCandidatePath;return '<div tabindex="0" role="button" class="assign-row '+(active?'selected':'')+'" data-candidate-path="'+esc(p.path)+'"><strong>'+esc(p.title)+'</strong><span class="muted">'+esc(p.path)+'</span><span class="muted">'+esc(p.source)+'</span><span class="assign-match">'+(x.s>=90?'Coincidència alta':x.s>=60?'Possible coincidència':x.s>0?'Coincidència parcial':'Sense coincidència clara')+'</span></div>'}).join(''):'<div class="empty">No hi ha altres pàgines candidates per al filtre actual.</div>';
+    el('assignCandidateList').innerHTML=detection+suggestions;
     var chosen=pages.find(function(p){return p.path===selectedCandidatePath});
-    el('assignSelectionSummary').innerHTML='<strong>Node:</strong> '+esc(nodeName(n))+' ('+esc(n.node_id)+')'+(chosen?' &nbsp; <strong>Pàgina seleccionada:</strong> '+esc(chosen.title)+' · '+esc(chosen.path):' &nbsp; Selecciona una pàgina de la columna dreta.');
+    var originMatch=matches.find(function(c){var p=pages.find(function(x){return normalizeRoute(x.path)===normalizeRoute(c.href)});return p&&p.path===selectedCandidatePath});
+    el('assignSelectionSummary').innerHTML='<strong>Node:</strong> '+esc(nodeName(n))+' ('+esc(n.node_id)+')'+(chosen?' &nbsp; <strong>Pàgina seleccionada:</strong> '+esc(chosen.title)+' · '+esc(chosen.path):' &nbsp; No hi ha cap pàgina seleccionada.')+(originMatch?' &nbsp; <strong>Verificada des de la targeta de:</strong> '+esc(originMatch.sourcePath):'');
   }
   async function load(){
     var token=el('token').value.trim();if(!token){el('assignPagesStatus').innerHTML='<span class="error">Introdueix primer el token GitHub a la part superior i torna a carregar.</span>';return}
@@ -404,8 +451,10 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
       var tree=await get('git/trees/'+encodeURIComponent(PAGE_BRANCH)+'?recursive=1',null,token);
       if(tree.truncated)throw new Error('GitHub ha truncat la llista de fitxers de PAGEWEB01; no es mostren resultats incomplets.');
       pages=(tree.tree||[]).filter(function(f){return f.type==='blob'&&/^web\/app\/.+\.(tsx|jsx|ts|js)$/.test(f.path)&&(/\/page\.(tsx|jsx|ts|js)$/.test(f.path)||f.path==='web/app/page.tsx')}).map(function(f){var s=f.path.replace(/^web\/app\//,'').replace(/\/page\.(tsx|jsx|ts|js)$/,'').replace(/\.(tsx|jsx|ts|js)$/,'');var route=f.path==='web/app/page.tsx'?'/':'/'+s;if(s.indexOf('(')===0||s.indexOf('api/')===0||s.indexOf('/api/')>=0)return null;return {path:route,source:f.path,sha:f.sha,title:pageTitle(f.path)}}).filter(Boolean).filter(function(p,i,a){return a.findIndex(function(x){return x.path===p.path})===i}).sort(function(a,b){return a.path.localeCompare(b.path)});
-      selectedNodeId='';selectedCandidatePath='';renderNodes();renderCandidates();
-      el('assignPagesStatus').textContent='Carregat correctament: '+nodes.length+' nodes de TREEWEB01 i '+pages.length+' pàgines candidates de PAGEWEB01. La selecció no desa cap canvi.';
+      selectedNodeId='';selectedCandidatePath='';renderNodes();
+      el('assignPagesStatus').textContent='Nodes i pàgines carregats. Comprovant els enllaços reals de les targetes…';
+      await scanCardLinks(token);renderCandidates();
+      el('assignPagesStatus').textContent='Carregat: '+nodes.length+' nodes i '+pages.length+' pàgines. Enllaços de targetes llegits de '+cardScanCount+'/'+pages.length+' fitxers; '+cardLinks.length+' targetes/enllaços detectats.'+(cardScanErrors.length?' AVÍS: '+cardScanErrors.length+' fitxers no s’han pogut llegir; la comprovació pot ser incompleta.':' La selecció no desa canvis ni publica a Vercel.');
     }catch(e){el('assignPagesStatus').innerHTML='<span class="error">'+esc(e.message||e)+'</span>'}
     finally{btn.disabled=false;btn.textContent='Carregar / actualitzar'}
   }
@@ -414,8 +463,8 @@ show('Editor preparat. Introdueix un token de GitHub vigent i prem Connectar. Si
   el('assignPagesModal').addEventListener('click',function(e){if(e.target===el('assignPagesModal'))el('assignPagesModal').classList.add('hidden')});
   el('loadAssignData').addEventListener('click',load);
   el('assignSearch').addEventListener('input',function(){renderNodes();renderCandidates()});
-  el('assignNodeList').addEventListener('click',function(e){var r=e.target.closest('[data-node-id]');if(r){selectedNodeId=r.getAttribute('data-node-id');selectedCandidatePath='';renderNodes();renderCandidates()}});
-  el('assignNodeList').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){var r=e.target.closest('[data-node-id]');if(r){e.preventDefault();selectedNodeId=r.getAttribute('data-node-id');selectedCandidatePath='';renderNodes();renderCandidates()}}});
+  el('assignNodeList').addEventListener('click',function(e){var r=e.target.closest('[data-node-id]');if(r){selectedNodeId=r.getAttribute('data-node-id');el('assignSearch').value='';var n=nodes.find(function(x){return x.node_id===selectedNodeId});selectedCandidatePath=n?associatedTargetPath(n):'';renderNodes();renderCandidates()}});
+  el('assignNodeList').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){var r=e.target.closest('[data-node-id]');if(r){e.preventDefault();selectedNodeId=r.getAttribute('data-node-id');el('assignSearch').value='';var n=nodes.find(function(x){return x.node_id===selectedNodeId});selectedCandidatePath=n?associatedTargetPath(n):'';renderNodes();renderCandidates()}}});
   el('assignCandidateList').addEventListener('click',function(e){var r=e.target.closest('[data-candidate-path]');if(r){selectedCandidatePath=r.getAttribute('data-candidate-path');renderCandidates()}});
   el('assignCandidateList').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){var r=e.target.closest('[data-candidate-path]');if(r){e.preventDefault();selectedCandidatePath=r.getAttribute('data-candidate-path');renderCandidates()}}});
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!el('assignPagesModal').classList.contains('hidden'))el('assignPagesModal').classList.add('hidden')});
